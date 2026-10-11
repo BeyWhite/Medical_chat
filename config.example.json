@@ -1,0 +1,20 @@
+{
+  "_说明": "把本文件改名为 config.json 即可生效；也可以不建此文件，启动后在网页的「接口设置」里填写。",
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8001
+  },
+  "dify": {
+    "base_url": "http://127.0.0.1/v1",
+    "api_key": "在这里填 app- 开头的应用密钥",
+    "dataset_api_key": "在这里填 dataset- 开头的知识库密钥（不用知识库管理可留空）",
+    "app_type": "chatflow",
+    "input_var": "query",
+    "extra_inputs": {},
+    "stream": true,
+    "timeout": 900
+  },
+  "session": {
+    "ttl_hours": 72
+  }
+}

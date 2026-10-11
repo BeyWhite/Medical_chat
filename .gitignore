@@ -1,0 +1,17 @@
+# 含密钥，不入库
+config.json
+# 本地数据：账号、会话、PID
+data/
+# 打包产物与备份
+dist/
+backup/
+# Python 缓存
+__pycache__/
+*.pyc
+# 临时文件
+_sse*.txt
+_srv.log
+_sample.txt
+_o.txt
+_r.txt
+_t.py

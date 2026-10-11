@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0891b2">
+<title>医学知识智能问答 · 问答5.0</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230e7490'/%3E%3Cpath d='M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ==================== 登录 / 注册 ==================== -->
+<div class="auth" id="authView">
+  <span class="auth-blob b1"></span><span class="auth-blob b2"></span><span class="auth-blob b3"></span>
+
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.4 8 10.5 4.6-1.1 8-5.5 8-10.5v-6L12 2Zm-1 13.5-3-3 1.4-1.4 1.6 1.6 4.2-4.2 1.4 1.4-5.6 5.6Z"/></svg>
+      </div>
+      <div>
+        <h1>医学知识智能问答</h1>
+        <p id="authSub">基于 Dify「问答5.0」· 相似问多轮检索 + 知识文件自动入库</p>
+      </div>
+    </div>
+
+    <div class="tabs" id="authTabs" data-tab="login">
+      <button class="tab active" data-tab="login" type="button">登录</button>
+      <button class="tab" data-tab="register" type="button">注册</button>
+      <span class="tab-ink"></span>
+    </div>
+
+    <form id="authForm" novalidate>
+      <label class="fg-auth">
+        <span>用户名</span>
+        <input id="username" type="text" placeholder="2-20 位中文 / 字母 / 数字" autocomplete="username">
+      </label>
+      <label class="fg-auth">
+        <span>密码</span>
+        <div class="pwd-wrap">
+          <input id="password" type="password" placeholder="至少 6 位" autocomplete="current-password">
+          <button type="button" class="pwd-eye" id="pwdEye" tabindex="-1" aria-label="显示密码">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>
+            </svg>
+          </button>
+        </div>
+      </label>
+      <label class="fg-auth" id="confirmField" hidden>
+        <span>确认密码</span>
+        <input id="confirm" type="password" placeholder="再次输入密码" autocomplete="new-password">
+      </label>
+
+      <div class="alert" id="authError" hidden></div>
+
+      <button type="submit" class="btn-primary" id="authSubmit">
+        <span class="btn-text">登 录</span>
+        <span class="spinner" hidden></span>
+      </button>
+    </form>
+
+    <p class="auth-foot">首次使用请切换到「注册」创建账号</p>
+  </div>
+</div>
+
+
+<!-- ==================== 主应用 ==================== -->
+<div class="app" id="app" hidden>
+  <!-- 侧栏 -->
+  <aside class="side" id="side">
+    <div class="side-head">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.4 8 10.5 4.6-1.1 8-5.5 8-10.5v-6L12 2Zm-1 13.5-3-3 1.4-1.4 1.6 1.6 4.2-4.2 1.4 1.4-5.6 5.6Z"/></svg>
+        </div>
+        <div class="brand-txt">
+          <h1>医学知识问答</h1>
+          <p id="brandSub">问答5.0 · 连接中…</p>
+        </div>
+      </div>
+      <button class="new-chat" id="newChat">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        新建对话
+      </button>
+    </div>
+
+    <div class="side-list" id="sessList">
+      <div class="side-label">历史对话</div>
+    </div>
+
+    <div class="side-foot">
+      <div class="side-user">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.2a7.4 7.4 0 0 1 14.4 0"/></svg>
+        <span id="userName">—</span>
+      </div>
+      <button class="side-foot-btn" id="btnKb">
+        <svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6.5A2.5 2.5 0 0 0 4 22.5"/><path d="M4 6.5v16"/></svg>
+        知识库管理
+      </button>
+      <button class="side-foot-btn" id="btnExport">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        导出当前对话
+      </button>
+      <button class="side-foot-btn" id="btnTheme">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.6M12 19.4V22M2 12h2.6M19.4 12H22M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></svg>
+        切换深色 / 浅色
+      </button>
+      <button class="side-foot-btn" id="btnSetting">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 14.5a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 7.5a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.5 3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.8 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
+        接口设置
+      </button>
+      <button class="side-foot-btn danger" id="btnLogout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        退出登录
+      </button>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <header class="top">
+      <button class="hamb" id="hamb"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+      <div class="top-title">
+        <span id="topTitle">新对话</span>
+        <em class="badge-mode" id="badgeMode">医学知识库</em>      </div>
+      <div class="stat" id="stat" title="点击重新检测"><i class="dot wait" id="dot"></i><span id="statTxt">检测中…</span></div>
+      <button class="icon-btn" id="btnSetting2" title="接口设置">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+      </button>
+    </header>
+
+    <div class="scroll" id="scroll">
+      <div class="thread" id="thread"></div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-in">
+        <div class="box" id="box">
+          <div class="files-bar" id="filesBar" hidden></div>
+          <textarea id="q" rows="1" placeholder="输入医学问题，如：什么是院前急救？也可点左下角 📎 上传医学知识文件自动入库。（Enter 发送，Shift+Enter 换行）"></textarea>
+          <div class="row">
+            <div class="hint">
+              <button type="button" class="attach" id="btnAttach" title="上传医学知识文件（txt/md/pdf/docx/xlsx/pptx 等），系统会自动生成问答对并写入知识库">
+                <svg viewBox="0 0 24 24"><path d="M21.4 11.05 12.3 20.2a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.85 1.85 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+                <span>上传知识文件</span>
+              </button>
+              <span class="hint-txt"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
+            </div>
+            <button class="send" id="send">
+              <svg viewBox="0 0 24 24" id="sendIcon"><path d="M4 12l16-8-6 8 6 8-16-8Z"/></svg>
+              <span id="sendTxt">发送</span>
+            </button>
+          </div>
+          <input type="file" id="fileInput" hidden multiple
+                 accept=".txt,.md,.markdown,.pdf,.html,.htm,.xlsx,.xls,.docx,.doc,.csv,.eml,.msg,.pptx,.ppt,.xml,.epub,.json">
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 接口设置抽屉 ==================== -->
+<div class="mask" id="mask"></div>
+<aside class="drawer" id="drawer">
+  <div class="dr-head">
+    <h3>接口设置</h3>
+    <button class="icon-btn" id="drClose"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="dr-body">
+    <div class="fg">
+      <label>API 访问点（Base URL）</label>
+      <input type="text" id="cfgBase" placeholder="http://127.0.0.1/v1">
+      <div class="quick" id="quickBases"></div>
+      <div class="desc">Dify 与本页面同机部署时填 <code>http://127.0.0.1/v1</code>；若 Dify 在另一台机器，填那台的局域网地址，例如 <code>http://192.168.x.x/v1</code>。</div>
+    </div>
+
+    <div class="fg">
+      <label>API 密钥（App Key）</label>
+      <input type="password" id="cfgKey" placeholder="留空表示不修改">
+      <div class="desc">当前：<code id="keyMasked">—</code>。以 <code>app-</code> 开头。密钥仅保存在本机服务端的 <code>config.json</code> 中，<b>不会下发到浏览器</b>。</div>
+    </div>
+
+    <div class="fg">
+      <label>知识库 API 密钥（Dataset Key）</label>
+      <input type="password" id="cfgDsKey" placeholder="留空表示不修改">
+      <div class="desc">当前：<code id="dsKeyMasked">—</code>。以 <code>dataset-</code> 开头，用于「知识库管理」（列表 / 编辑 / 删除 / 启用禁用）。同样只在服务端保存，不下发到浏览器。</div>
+    </div>
+
+    <div class="fg">
+      <label>应用类型</label>
+      <select id="cfgType">
+        <option value="chatflow">对话流 Chatflow（/chat-messages，带上下文）</option>
+        <option value="workflow">工作流 Workflow（/workflows/run，单次执行）</option>
+      </select>
+      <div class="desc">「问答5.0」实测为 <b>advanced-chat（对话流）</b>，保持默认即可。</div>
+    </div>
+
+    <div class="fg" id="fgInputVar" hidden>
+      <label>工作流输入变量名</label>
+      <input type="text" id="cfgInputVar" placeholder="query">
+      <div class="desc">仅工作流模式使用：用户提问会放进这个变量。</div>
+    </div>
+
+    <div class="fg">
+      <label>附加输入变量 inputs（JSON，可选）</label>
+      <textarea id="cfgInputs" placeholder="{}"></textarea>
+      <div class="desc">该应用的起始节点未定义必填输入变量，保持 <code>{}</code> 即可。</div>
+    </div>
+
+    <div class="fg">
+      <label class="rowchk"><input type="checkbox" id="cfgStream"> 流式输出（推荐，首字更快）</label>
+      <div class="desc">实测首字延迟约 17 秒、完整应答约 25–70 秒，关闭流式时页面会长时间无反馈。</div>
+    </div>
+
+    <div class="fg">
+      <label>请求超时（秒）</label>
+      <input type="number" id="cfgTimeout" min="10" max="2400" placeholder="900">
+      <div class="desc">问答5.0 的问答分支要跑「5 个相似问 → 逐问检索作答 → 汇总」，实测整体约 <b>3~4 分钟</b>，建议不小于 600 秒。</div>
+    </div>
+
+    <div class="tip">
+      <b>访问点自测：</b>服务端会请求 Dify 的 <code>/info</code> 自动探测，命中后顶栏状态点变绿并显示应用名。点顶栏状态点可随时重新检测。<br><br>
+      <b>两条分支：</b>①<b>不传文件</b> = 医学问题检索问答（生成 5 个相似问 → 循环检索知识库 → 去重汇总作答，带知识来源，耗时约 3~4 分钟）；②<b>传文件</b> = 知识文件自动入库（提取正文 → 生成问答对 → 按文件名新建/复用知识库 → 写入，回答里给出知识库 ID）。<br><br>
+      <b>文件入口：</b>点输入框左下角的「📎 上传知识文件」按钮，选中的文件会先上传到 Dify，随下一条消息一起提交。<br><br>
+      <b>提问建议：</b>知识库以急救内容为主（院前急救、心肺复苏、中暑、淹溺、电击伤、急性中毒、创伤止血包扎等）。超出范围时检索返回空结果，标记会显示「未命中知识库」，回答将退化为模型自有知识，准确性无保障。
+    </div>
+  </div>
+  <div class="dr-foot">
+    <button class="btn gho" id="btnReset">恢复默认</button>
+    <button class="btn pri" id="btnSave">保存并重连</button>
+  </div>
+</aside>
+
+<!-- ==================== 知识库管理抽屉 ==================== -->
+<div class="mask" id="kbMask"></div>
+<aside class="kb-drawer" id="kbDrawer"></aside>
+
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+<script src="/kb.js"></script>
+</body>
+</html>
