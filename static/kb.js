@@ -88,29 +88,8 @@
   }
 
   /* ---------------- 通用弹窗 ---------------- */
-  // 同一时刻只允许一个弹窗，且被顶替的弹窗**立即从 DOM 移除**。
-  // 原因：弹窗里有 kbmReq / kbeName / kseContent 等固定 id，若旧弹窗还在淡出，
-  // document.getElementById 会取到旧弹窗里的同名字段 → "填了没生效"甚至误删。
-  var activeModalClose = null;
-  var lastModalRoot = null;
-
-  // 取字段：优先在「本次弹窗」内部找，找不到才回退到全局。
-  function mq(id) {
-    if (lastModalRoot) {
-      var el = lastModalRoot.querySelector('#' + id);
-      if (el) return el;
-    }
-    return document.getElementById(id);
-  }
-
   function modal(opts) {
     return new Promise(function (resolve) {
-      if (activeModalClose) {
-        // 立即移除（不淡出），避免同名字段串台
-        try { activeModalClose(false, true); } catch (e) {}
-        activeModalClose = null;
-      }
-
       var mask = document.createElement('div');
       mask.className = 'kb-modal-mask';
       var need = !!opts.requireText;
@@ -119,19 +98,12 @@
           '<div class="kbm-head"><b>' + esc(opts.title || '') + '</b></div>' +
           '<div class="kbm-body">' +
             (opts.body || '') +
-            (need
-              ? '<div class="kbm-req">' +
-                  '<label for="kbmReq">为防误操作，请输入知识库名称 <b>' + esc(opts.requireText) + '</b> 以确认</label>' +
-                  '<input type="text" id="kbmReq" autocomplete="off" spellcheck="false" placeholder="在此输入完整的知识库名称">' +
-                  '<div class="kbm-reqstate" id="kbmReqState"></div>' +
-                '</div>'
-              : '') +
+            (need ? '<label class="kbm-req">请输入知识库名称 <b>' + esc(opts.requireText) + '</b> 以确认' +
+                      '<input type="text" id="kbmReq" placeholder="' + esc(opts.requireText) + '" autocomplete="off"></label>' : '') +
           '</div>' +
           '<div class="kbm-foot">' +
             '<button class="btn gho" data-act="cancel">取消</button>' +
-            // 注意：这里**故意不加 disabled**。危险按钮的背景色是显式设定的，
-            // 浏览器不会把它变灰，用户会以为按钮可用但点击毫无反应（就是这样踩的坑）。
-            '<button class="btn ' + (opts.danger ? 'dgr' : 'pri') + '" data-act="ok">' +
+            '<button class="btn ' + (opts.danger ? 'dgr' : 'pri') + '" data-act="ok"' + (need ? ' disabled' : '') + '>' +
               esc(opts.confirmText || '确定') + '</button>' +
           '</div>' +
         '</div>';
@@ -139,63 +111,21 @@
       requestAnimationFrame(function () { mask.classList.add('on'); });
 
       var input = mask.querySelector('#kbmReq');
-      var state = mask.querySelector('#kbmReqState');
-
-      function syncState() {
-        if (!need || !input || !state) return;
-        var v = input.value.trim();
-        if (!v) {
-          state.className = 'kbm-reqstate';
-          state.textContent = '⚠ 需要输入上面的完整名称才能继续';
-        } else if (v === opts.requireText) {
-          state.className = 'kbm-reqstate ok';
-          state.textContent = '✓ 名称一致，可以继续';
-        } else {
-          state.className = 'kbm-reqstate bad';
-          state.textContent = '✗ 名称不一致（请检查空格、标点与后缀）';
-        }
+      var okBtn = mask.querySelector('[data-act="ok"]');
+      if (input) {
+        input.addEventListener('input', function () {
+          okBtn.disabled = input.value.trim() !== opts.requireText;
+        });
       }
-
-      function close(v, immediate) {
-        if (activeModalClose === close) activeModalClose = null;
-        lastModalRoot = mask;   // 让 close 之后的字段读取仍指向本次弹窗
+      function close(v) {
         mask.classList.remove('on');
-        if (immediate) {
-          if (mask.parentNode) mask.parentNode.removeChild(mask);
-        } else {
-          setTimeout(function () { if (mask.parentNode) mask.parentNode.removeChild(mask); }, 180);
-        }
+        setTimeout(function () { if (mask.parentNode) mask.parentNode.removeChild(mask); }, 180);
         resolve(v);
       }
-      activeModalClose = close;
-      lastModalRoot = mask;
-
-      function doOk() {
-        if (need && (!input || input.value.trim() !== opts.requireText)) {
-          if (input) {
-            input.classList.add('shake');
-            setTimeout(function () { input.classList.remove('shake'); }, 520);
-            input.focus();
-          }
-          toast('请先输入完整的知识库名称：' + opts.requireText, true);
-          return;
-        }
-        close(true);
-      }
-
-      if (input) {
-        input.addEventListener('input', syncState);
-        input.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doOk(); }
-        });
-        syncState();
-      }
-
       mask.addEventListener('click', function (e) {
-        var el = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
-        var act = el ? el.getAttribute('data-act') : '';
-        if (act === 'ok') { doOk(); return; }
-        if (act === 'cancel' || e.target === mask) { close(false); return; }
+        var act = e.target && e.target.getAttribute && e.target.getAttribute('data-act');
+        if (act === 'cancel' || e.target === mask) return close(false);
+        if (act === 'ok') return close(true);
       });
       if (input) setTimeout(function () { input.focus(); }, 60);
     });
@@ -511,16 +441,16 @@
 
     return modal({ title: '编辑知识库', body: body, confirmText: '保存' }).then(function (ok) {
       if (!ok) return null;
-      var name = mq('kbeName').value.trim();
+      var name = $('kbeName').value.trim();
       if (!name) { toast('名称不能为空', true); return null; }
       return {
         name: name,
-        description: mq('kbeDesc').value.trim(),
+        description: $('kbeDesc').value.trim(),
         retrieval: {
-          topK: parseInt(mq('kbeTopK').value, 10) || 3,
-          scoreThresholdEnabled: mq('kbeThrOn').checked,
-          scoreThreshold: parseFloat(mq('kbeThr').value) || 0,
-          rerankingEnable: mq('kbeRr').checked
+          topK: parseInt($('kbeTopK').value, 10) || 3,
+          scoreThresholdEnabled: $('kbeThrOn').checked,
+          scoreThreshold: parseFloat($('kbeThr').value) || 0,
+          rerankingEnable: $('kbeRr').checked
         }
       };
     });
@@ -545,58 +475,26 @@
       var act = btn.getAttribute('data-act');
       var id = btn.getAttribute('data-id');
       var ds = st.ds.items.filter(function (x) { return x.id === id; })[0];
-      if (act === 'edit') {
-        if (!ds) return toast('数据已过期，请刷新后重试', true);
+      if (act === 'edit' && ds) {
         editDsDialog(ds).then(function (patch) { if (patch) saveDs(ds, patch, btn); });
         return;
       }
-      if (act === 'docs') {
-        if (!ds) return toast('数据已过期，请刷新后重试', true);
-        openDocs(ds); return;
-      }
-      if (act === 'enable' || act === 'disable') {
-        if (!ds) return toast('数据已过期，请刷新后重试', true);
-        toggleDs(ds, act === 'enable', btn); return;
-      }
-      if (act === 'del') {
-        if (!ds) return toast('数据已过期，请刷新后重试', true);
-        delDs(ds, btn); return;
-      }
+      if (act === 'docs') { openDocs(ds); return; }
+      if (act === 'enable' || act === 'disable') { toggleDs(ds, act === 'enable', btn); return; }
+      if (act === 'del') { delDs(ds, btn); return; }
 
       // 文档级
       var doc = st.docs.items.filter(function (x) { return x.id === id; })[0];
-      if (act === 'segs') {
-        if (!doc) return toast('数据已过期，请刷新后重试', true);
-        openSegs(doc); return;
-      }
-      if (act === 'doenable' || act === 'dodisable') {
-        if (!doc) return toast('数据已过期，请刷新后重试', true);
-        setDocEnabled(doc, act === 'doenable', btn); return;
-      }
-      if (act === 'archive' || act === 'unarchive') {
-        if (!doc) return toast('数据已过期，请刷新后重试', true);
-        setDocArchived(doc, act === 'archive', btn); return;
-      }
-      if (act === 'docdel') {
-        if (!doc) return toast('数据已过期，请刷新后重试', true);
-        delDoc(doc, btn); return;
-      }
+      if (act === 'segs' && doc) { openSegs(doc); return; }
+      if (act === 'doenable' || act === 'dodisable') { setDocEnabled(doc, act === 'doenable', btn); return; }
+      if (act === 'archive' || act === 'unarchive') { setDocArchived(doc, act === 'archive', btn); return; }
+      if (act === 'docdel') { delDoc(doc, btn); return; }
 
       // 分段级
       var seg = st.segs.items.filter(function (x) { return x.id === id; })[0];
-      if (act === 'segedit') {
-        if (!seg) return toast('数据已过期，请刷新后重试', true);
-        editSeg(seg, btn); return;
-      }
-      if (act === 'segenable' || act === 'segdisable') {
-        if (!seg) return toast('数据已过期，请刷新后重试', true);
-        setSegEnabled(seg, act === 'segenable', btn); return;
-      }
-      if (act === 'segdel') {
-        if (!seg) return toast('数据已过期，请刷新后重试', true);
-        delSeg(seg, btn); return;
-      }
-      toast('未识别的操作：' + act, true);
+      if (act === 'segedit' && seg) { editSeg(seg, btn); return; }
+      if (act === 'segenable' || act === 'segdisable') { setSegEnabled(seg, act === 'segenable', btn); return; }
+      if (act === 'segdel') { delSeg(seg, btn); return; }
       return;
     }
     // 整卡点击进入文档管理
@@ -605,7 +503,6 @@
       var id2 = card.getAttribute('data-ds');
       var d2 = st.ds.items.filter(function (x) { return x.id === id2; })[0];
       if (d2) openDocs(d2);
-      else toast('数据已过期，请刷新后重试', true);
     }
   }
 
@@ -762,11 +659,11 @@
     modal({ title: '编辑分段 #' + (seg.position != null ? seg.position : ''), body: body, confirmText: '保存并重建索引' })
       .then(function (ok) {
         if (!ok) return;
-        var content = mq('kseContent').value;
+        var content = $('kseContent').value;
         if (!content.trim()) { toast('分段内容不能为空', true); return; }
-        var kwRaw = mq('kseKw').value;
+        var kwRaw = $('kseKw').value;
         var keywords = kwRaw.split(/[,，\s]+/).filter(function (s) { return s; });
-        saveSeg(seg, { content: content, keywords: keywords, enabled: mq('kseOn').checked }, btn);
+        saveSeg(seg, { content: content, keywords: keywords, enabled: $('kseOn').checked }, btn);
       });
   }
 

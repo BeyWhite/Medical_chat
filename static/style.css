@@ -585,37 +585,5 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
 /* hidden 属性优先（避免被 .kb-head .icon-btn{display:flex} 覆盖） */
 .kb-head .icon-btn[hidden]{display:none}
 
-/* 分段关键词只读展示 */
-.kbm-kws{display:flex;flex-wrap:wrap;gap:6px}
-.kbm-kws i{font-style:normal;font-size:var(--fs-xs);padding:2px 9px;border-radius:20px;
-  background:var(--brand-soft);color:var(--brand-ink);border:1px solid var(--brand-soft)}
-
 /* 表单小提示 */
 .kbm-tip{display:block;font-style:normal;font-size:var(--fs-xs);color:var(--text-3);margin-top:5px}
-
-/* ==================== 弹窗可用性修复（2026-10-11） ==================== */
-/* 1) toast 层级必须高于弹窗(.kb-modal-mask=120)与知识库抽屉(95)，
-      否则弹窗内的提示会被遮住 —— 用户看不到任何反馈，误以为"点击没反应"。 */
-.toast{z-index:200}
-
-/* 2) 自定义背景色的按钮 disabled 后浏览器不会变灰（.btn.dgr / .btn.pri 都是显式 background），
-      用户会以为可点。统一做灰化，让"不可用"一眼可见。 */
-.btn:disabled,.btn.sm:disabled{opacity:.5;filter:grayscale(.55);cursor:not-allowed}
-.btn.dgr:disabled,.btn.pri:disabled{opacity:.5;filter:grayscale(.6)}
-
-/* 3) 危险确认弹窗：输入框校验状态 + 不一致时抖动 */
-.kbm-req label{display:block;font-size:var(--fs-sm);color:var(--text-2)}
-.kbm-req b{color:var(--danger)}
-.kbm-req input{margin-top:7px}
-.kbm-reqstate{font-size:var(--fs-xs);margin-top:6px;min-height:1.4em;color:var(--text-3)}
-.kbm-reqstate.ok{color:var(--ok)}
-.kbm-reqstate.bad{color:var(--danger)}
-.kbm-req input.shake{animation:kbm-shake .5s;border-color:var(--danger)}
-@keyframes kbm-shake{
-  0%,100%{transform:translateX(0)}
-  15%{transform:translateX(-6px)}
-  30%{transform:translateX(6px)}
-  45%{transform:translateX(-4px)}
-  60%{transform:translateX(4px)}
-  80%{transform:translateX(-2px)}
-}
