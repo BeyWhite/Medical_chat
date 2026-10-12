@@ -31,14 +31,16 @@ NAME = "medical-qa-50"
 EXCLUDE_NAMES = {
     "config.json",          # 含你的真实密钥
     "data",                 # 含本地账号、会话、PID
+    "backup",               # 本地备份快照，含密钥与数据，绝不能外发
     "dev",                  # 开发期自检脚本（可用 --keep-dev 保留）
     "__pycache__",
+    "node_modules",
     ".git",
     ".idea",
     ".vscode",
     "dist",
 }
-EXCLUDE_SUFFIX = (".pyc", ".pyo", ".log", ".tmp", ".bak", ".db", ".db-wal", ".db-shm")
+EXCLUDE_SUFFIX = (".pyc", ".pyo", ".log", ".tmp", ".bak", ".db", ".db-wal", ".db-shm", ".zip")
 EXCLUDE_PREFIX = ("._", "~$")
 
 
