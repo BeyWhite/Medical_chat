@@ -228,7 +228,16 @@ python server.py
 
 ## 八、自检脚本
 
-**① 知识库管理（约 2~3 分钟，推荐先跑这个）**
+**① 启停脚本（约 1 分钟，改过 .bat 一定要跑）**
+
+```bash
+bash dev/verify_bats.sh
+```
+
+真实运行 `start.bat` / `stop.bat` / `restart.bat`，断言：端口是否真的监听、页面是否 200、
+PID 文件是否一致、停止后端口是否释放、脚本里有没有 cmd 解析错误，共 21 项。
+
+**② 知识库管理（约 2~3 分钟，推荐先跑这个）**
 
 ```bash
 python verify_kb.py
@@ -239,7 +248,7 @@ python verify_kb.py
 文档归档 / 启停 / 筛选 → 分段编辑内容与关键词 / 全量启停 / 删除 → 删文档 → 删知识库 → 权限校验。
 **跑完会自动删掉临时知识库**，共 51 项断言。
 
-**② 问答 + 文件上传（约 8~10 分钟）**
+**③ 问答 + 文件上传（约 8~10 分钟）**
 
 ```bash
 bash verify.sh          # Windows 上用 Git Bash 执行；macOS / Linux 直接 ./verify.sh
@@ -254,7 +263,7 @@ bash verify.sh          # Windows 上用 Git Bash 执行；macOS / Linux 直接 
 > - 它会自动选一个**空闲端口**，所以就算你正开着服务也不冲突；
 > - 两个脚本跑完都会**自动删掉**在 Dify 里真实建的临时知识库。
 
-**③ 前端弹窗自检（可选，需要 node + jsdom）**
+**④ 删除流程回归（dev，需要 node + jsdom）**
 
 ```bash
 npm i jsdom
@@ -318,3 +327,45 @@ Dify 不允许修改已禁用的分段，先在编辑弹窗里勾上「启用这
 → 注册 → 在「接口设置」里填自己的 Dify 地址与两个密钥 → 完成。
 
 完整清单与注意事项见 **`分发说明.md`**。
+
+---
+
+## 十一、维护须知（改代码前请读）
+
+### ⚠️ `.bat` 脚本必须保持纯 ASCII
+
+`cmd.exe` 解析批处理文件时按字节偏移处理，**UTF-8 的中文会让它错乱**：
+`%ERRORLEVEL%` 会被截断成 `'ORLEVEL"'`、`REM` 后面的中文会变成"未知命令"，
+结果就是**脚本完全跑不起来**（曾真实发生过，`start.bat` 因此长期无法使用）。
+
+所以本项目约定：
+
+- `.bat` 的**内容一律用英文**（可在开头保留 `chcp 65001 >nul`，
+  这样 **Python 输出的中文横幅**仍能正常显示，两者不冲突）；
+- 中文一律放在 `.md` 文档、`.py`、`.js` 里 —— 这些没有编码问题；
+- **改完 `.bat` 一定要真机跑一遍**：`bash dev/verify_bats.sh`
+  （它会检查是否含非 ASCII，并真实启停一轮）。
+
+### 其它约定
+
+| 项 | 约定 |
+|---|---|
+| 端口占用 | 绑定前必须先用 `port_in_use()` 探测。Windows 下 `allow_reuse_address` 默认开启，两个进程能同时绑同一端口，表现为"启动了但访问异常" |
+| 密钥判断 | 用 `_key_is_real()` 识别占位符，别用 `startswith("app-xxx")` 这种脆弱写法 |
+| 危险按钮 | 不要给按钮加 `disabled` 又不做灰化——按钮有固定背景色时浏览器不会变灰，用户会以为能点。要用"可点 + 点击时校验 + 明确提示" |
+| 弹窗层级 | `toast`(200) > 弹窗遮罩(120) > 抽屉(95)，改动前先确认提示不会被盖住 |
+| 弹窗字段 id | 弹窗内有固定 id（`kbmReq`/`kbeName`/`kseContent`），同一时刻只允许一个弹窗，否则 `getElementById` 会取到上一个弹窗的元素 |
+| 自检 | `verify.sh` 会清空 `data/app.db`（本地账号会丢）；日常回归用 `verify_kb.py` |
+
+### 版本管理与回退
+
+已用 Git 管理（`config.json`、`data/`、`dist/`、`backup/` 已在 `.gitignore` 中排除）。
+
+```bash
+git log --oneline            # 看历史
+git diff                     # 看改动
+git checkout <commit> -- .   # 回退到某个提交
+git revert <commit>          # 撤销某次提交（保留历史，更安全）
+```
+
+另外 `backup/` 目录里留有历史快照 zip（手工备份），可作为第二重保险。
