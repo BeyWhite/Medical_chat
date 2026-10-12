@@ -12,7 +12,9 @@
     "input_var": "query",
     "extra_inputs": {},
     "stream": true,
-    "timeout": 900
+    "timeout": 900,
+    "_retrieval_dataset_ids": "「检索库」清单：Dify 工作流「知识检索」节点覆盖到的知识库 id。列表里会把它们标成『检索库』，只有它们能被新对话检索到。可以在这里手填，也可以在页面上用「编辑 → 列入检索库」勾选。",
+    "retrieval_dataset_ids": []
   },
   "session": {
     "ttl_hours": 72

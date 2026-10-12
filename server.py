@@ -66,8 +66,26 @@ DEFAULT_CONFIG = {
         "extra_inputs": {},
         "stream": True,
         "timeout": 900,
+        # 「检索库」清单：Dify 应用里「知识检索」节点覆盖到的知识库 id。
+        # 由「知识库管理」页维护（列表里的「设为检索库」/编辑弹窗），
+        # 与工作流图保持一致 —— 工作流改过检索范围后请在页面上同步。
+        "retrieval_dataset_ids": [],
     },
     "session": {"ttl_hours": 72},
+}
+
+# 归档（并入检索库）时用的分段规格 —— 与工作流「写入问答对txt」节点完全一致
+# （自定义分段：分隔符 \n / 最大 4000 / 重叠 50，预处理开启「替换连续空格换行制表符」）
+# 保持一致，归档进检索库的数据才会与原入库数据用同一种切分方式被索引。
+ARCHIVE_PROCESS_RULE = {
+    "mode": "custom",
+    "rules": {
+        "pre_processing_rules": [
+            {"id": "remove_extra_spaces", "enabled": True},
+            {"id": "remove_urls_emails", "enabled": False},
+        ],
+        "segmentation": {"separator": "\n", "max_tokens": 4000, "chunk_overlap": 50},
+    },
 }
 
 # 允许上传的知识文件后缀（与 Dify 应用「问答5.0」的文件上传配置一致）
@@ -153,6 +171,26 @@ def dataset_ready():
     d = CONFIG.get("dify") or {}
     base = (d.get("base_url") or "").strip()
     return bool(base) and _key_is_real(d.get("dataset_api_key"), "dataset-")
+
+
+def retrieval_ids():
+    """「检索库」id 列表（去重保序）。这是前端侧的登记表，需与 Dify 工作流的检索范围一致。"""
+    d = CONFIG.get("dify") or {}
+    raw = d.get("retrieval_dataset_ids") or []
+    out, seen = [], set()
+    for x in raw:
+        x = str(x or "").strip()
+        if x and x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def set_retrieval_ids(ids):
+    d = CONFIG.setdefault("dify", {})
+    d["retrieval_dataset_ids"] = list(ids)
+    save_config()
+    print("[kb] 检索库清单已更新：%d 个" % len(ids))
 
 
 # --------------------------------------------------------------------------
@@ -923,9 +961,12 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---------------- 知识库管理（转发 Dify Service API） ----------------
     KB_ROUTES = (
+        ("retrieval", re.compile(r"^/api/kb/retrieval$")),
         ("list", re.compile(r"^/api/kb$")),
         ("toggle", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/toggle$")),
+        ("archds", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/archive-to$")),
         ("docs", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/documents$")),
+        ("archdoc", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/documents/([A-Za-z0-9_\-]+)/archive-to$")),
         ("segs", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/documents/([A-Za-z0-9_\-]+)/segments$")),
         ("seg", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/documents/([A-Za-z0-9_\-]+)/segments/([A-Za-z0-9_\-]+)$")),
         ("doc", re.compile(r"^/api/kb/([A-Za-z0-9_\-]+)/documents/([A-Za-z0-9_\-]+)$")),
@@ -964,12 +1005,18 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": False, "error": "接口不存在"}, 404)
         name, g = hit
         try:
+            if name == "retrieval":
+                return self.kb_retrieval(method)
             if name == "list" and method == "GET":
                 return self.kb_list()
             if name == "detail":
                 return self.kb_detail(g[0], method)
             if name == "toggle" and method == "POST":
                 return self.kb_toggle(g[0])
+            if name == "archds" and method == "POST":
+                return self.kb_archive_ds(g[0])
+            if name == "archdoc" and method == "POST":
+                return self.kb_archive_doc(g[0], g[1])
             if name == "docs" and method == "GET":
                 return self.kb_docs(g[0])
             if name == "doc":
@@ -1132,6 +1179,226 @@ class Handler(BaseHTTPRequestHandler):
             "hasMore": bool(obj.get("has_more")),
             "documents": [norm_document(d) for d in (obj.get("data") or [])],
         })
+
+    # ---------------- 检索库清单 ----------------
+    def retrieval_payload(self):
+        ids = retrieval_ids()
+        items = []
+        for i in ids:
+            try:
+                obj = dify_ok("GET", "/datasets/" + i, timeout=30)
+                stt = kb_stat(i) or {}
+                items.append({
+                    "id": i,
+                    "name": obj.get("name") or "",
+                    "exists": True,
+                    "documentCount": obj.get("document_count") or 0,
+                    "enabledDocuments": stt.get("available"),
+                    "disabledDocuments": stt.get("disabled"),
+                })
+            except DifyApiError as e:
+                items.append({"id": i, "name": "", "exists": False, "documentCount": 0,
+                              "error": e.message})
+        return {"ids": ids, "datasets": items}
+
+    def kb_retrieval(self, method):
+        """GET 读检索库清单；POST 维护（ids 覆盖 / add / remove）。"""
+        if method == "GET":
+            return self.send_json({"ok": True, "retrieval": self.retrieval_payload()})
+        if method == "POST":
+            body = self.read_json()
+            cur = retrieval_ids()
+            if isinstance(body.get("ids"), list):
+                new = [str(x).strip() for x in body["ids"]]
+            elif body.get("add"):
+                new = cur + [str(body["add"]).strip()]
+            elif body.get("remove"):
+                drop = str(body["remove"]).strip()
+                new = [x for x in cur if x != drop]
+            else:
+                return self.send_json({"ok": False, "error": "需要 ids / add / remove 之一"}, 400)
+            seen, out = set(), []
+            for x in new:
+                if x and x not in seen:
+                    seen.add(x)
+                    out.append(x)
+            set_retrieval_ids(out)
+            return self.send_json({"ok": True, "retrieval": self.retrieval_payload()})
+        return self.send_json({"ok": False, "error": "方法不支持"}, 405)
+
+    # ---------------- 归档到检索库 ----------------
+    def kb_all_doc_ids(self, ds_id):
+        """该知识库全部文档（含禁用/归档）的 (id, name) 列表。"""
+        out, page = [], 1
+        while page <= 100:
+            obj = dify_ok("GET", "/datasets/%s/documents?page=%d&limit=100" % (ds_id, page), timeout=40)
+            items = obj.get("data") or []
+            for d in items:
+                out.append((d.get("id"), d.get("name") or ""))
+            if not obj.get("has_more") or not items:
+                break
+            page += 1
+        return out
+
+    def kb_doc_text(self, ds_id, doc_id):
+        """把文档里「启用中」的分段按位置拼成「一行一段」的正文。
+
+        返回 (正文, 收录段数, 跳过段数)。归档只搬启用中的分段 —— 禁用/已归档的分段
+        本来就不会被检索命中，搬过去没有意义。
+        """
+        segs, page, skipped = [], 1, 0
+        while page <= 200:
+            obj = dify_ok("GET",
+                          "/datasets/%s/documents/%s/segments?page=%d&limit=100" % (ds_id, doc_id, page),
+                          timeout=60)
+            items = obj.get("data") or []
+            for s in items:
+                if s.get("enabled") and s.get("status") != "disabled":
+                    segs.append(s)
+                else:
+                    skipped += 1
+            if not obj.get("has_more") or not items:
+                break
+            page += 1
+        segs.sort(key=lambda s: (s.get("position") if s.get("position") is not None else 0))
+        lines = [(s.get("content") or "").strip() for s in segs]
+        lines = [x for x in lines if x]
+        return "\n".join(lines), len(lines), skipped
+
+    def wait_doc_indexed(self, ds_id, doc_id, timeout=240):
+        """等目标文档建好索引（create-by-text 是异步索引）。返回 indexing_status。"""
+        t0 = time.time()
+        last = "indexing"
+        while time.time() - t0 < timeout:
+            try:
+                obj = dify_ok("GET", "/datasets/%s/documents/%s" % (ds_id, doc_id), timeout=30)
+                stt = obj.get("indexing_status") or ""
+            except DifyApiError as e:
+                if e.status in (404,):
+                    stt = ""
+                else:
+                    stt = ""
+            if stt in ("completed", "error"):
+                return stt
+            if stt:
+                last = stt
+            time.sleep(1.2)
+        return last
+
+    def kb_archive(self, src_ds, doc_ids, target_id, delete_source, src_name=""):
+        """把 src_ds 中指定文档的内容复制进 target_id（检索库），可选删除源文档。
+
+        目标库里的同名文档会被覆盖更新（Dify 的 create-by-text 对同库同名文档做 upsert），
+        所以重复归档是幂等的。
+        """
+        if str(target_id) == str(src_ds):
+            return self.send_json({"ok": False, "error": "源知识库和目标检索库是同一个"}, 400)
+        if target_id not in retrieval_ids():
+            return self.send_json({
+                "ok": False,
+                "error": "目标不是「检索库」：Dify 工作流只会检索清单里的知识库，"
+                         "归档到这里也不会被检索到。请先把目标库设为检索库。",
+            }, 400)
+        try:
+            tgt = dify_ok("GET", "/datasets/" + target_id, timeout=30)
+        except DifyApiError as e:
+            return self.send_json({"ok": False, "error": "目标检索库不存在：%s" % e.message}, 400)
+
+        if not doc_ids:
+            doc_ids = [d[0] for d in self.kb_all_doc_ids(src_ds)]
+        if not doc_ids:
+            return self.send_json({"ok": False, "error": "源知识库里没有文档"}, 400)
+
+        archived, skipped = [], []
+        for doc_id in doc_ids:
+            try:
+                meta = dify_ok("GET", "/datasets/%s/documents/%s" % (src_ds, doc_id), timeout=30)
+                name = meta.get("name") or doc_id
+            except DifyApiError as e:
+                skipped.append({"documentId": doc_id, "name": doc_id, "reason": "读文档失败：%s" % e.message})
+                continue
+            try:
+                text, seg_n, sk_n = self.kb_doc_text(src_ds, doc_id)
+            except DifyApiError as e:
+                skipped.append({"documentId": doc_id, "name": name, "reason": "读分段失败：%s" % e.message})
+                continue
+            if not text.strip():
+                skipped.append({"documentId": doc_id, "name": name,
+                                "reason": "没有启用中的分段，没有可归档的内容"})
+                continue
+
+            payload = {
+                "name": name,
+                "text": text,
+                "indexing_technique": "high_quality",
+                "process_rule": ARCHIVE_PROCESS_RULE,
+            }
+            try:
+                res = dify_ok_retry("POST", "/datasets/%s/document/create-by-text" % target_id,
+                                    payload, timeout=300, tries=3, delay=3)
+            except DifyApiError as e:
+                skipped.append({"documentId": doc_id, "name": name, "reason": "写入失败：%s" % e.message})
+                continue
+
+            new_doc = (res or {}).get("document") or {}
+            new_id = new_doc.get("id")
+            status = new_doc.get("indexing_status") or "indexing"
+            if new_id and status not in ("completed", "error"):
+                status = self.wait_doc_indexed(target_id, new_id)
+
+            if delete_source:
+                try:
+                    dify_ok("DELETE", "/datasets/%s/documents/%s" % (src_ds, doc_id))
+                except DifyApiError as e:
+                    skipped.append({"documentId": doc_id, "name": name,
+                                    "reason": "已归档，但删除源文档失败：%s" % e.message})
+
+            archived.append({
+                "documentId": doc_id, "name": name,
+                "targetDocumentId": new_id, "segments": seg_n,
+                "skippedSegments": sk_n, "chars": len(text),
+                "indexingStatus": status,
+            })
+
+        kb_stat_invalidate(target_id)
+        kb_stat_invalidate(src_ds)
+        print("[kb] 归档 %s -> %s：成功 %d 篇 / 跳过 %d 篇（源=%s）"
+              % (src_ds, target_id, len(archived), len(skipped), src_name or ""))
+        self.send_json({
+            "ok": True,
+            "target": {"id": target_id, "name": tgt.get("name") or ""},
+            "source": {"id": src_ds, "name": src_name},
+            "archived": archived,
+            "skipped": skipped,
+            "deletedSource": bool(delete_source),
+        })
+
+    def kb_archive_ds(self, ds_id):
+        body = self.read_json()
+        target = str(body.get("target") or "").strip()
+        if not target:
+            return self.send_json({"ok": False, "error": "缺少目标检索库 target"}, 400)
+        doc_ids = body.get("documentIds")
+        if not isinstance(doc_ids, list):
+            doc_ids = None
+        try:
+            meta = dify_ok("GET", "/datasets/" + ds_id, timeout=30)
+            src_name = meta.get("name") or ""
+        except DifyApiError as e:
+            return self.send_json({"ok": False, "error": "源知识库不存在：%s" % e.message}, 404)
+        return self.kb_archive(ds_id, doc_ids, target, bool(body.get("deleteSource")), src_name)
+
+    def kb_archive_doc(self, ds_id, doc_id):
+        body = self.read_json()
+        target = str(body.get("target") or "").strip()
+        if not target:
+            return self.send_json({"ok": False, "error": "缺少目标检索库 target"}, 400)
+        try:
+            meta = dify_ok("GET", "/datasets/" + ds_id, timeout=30)
+            src_name = meta.get("name") or ""
+        except DifyApiError as e:
+            return self.send_json({"ok": False, "error": "源知识库不存在：%s" % e.message}, 404)
+        return self.kb_archive(ds_id, [doc_id], target, bool(body.get("deleteSource")), src_name)
 
     def kb_doc(self, ds_id, doc_id, method):
         if method == "PATCH":

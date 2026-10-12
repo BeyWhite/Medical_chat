@@ -517,6 +517,15 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
 .kb-state.archived{color:var(--text-3)}
 .kb-state.empty{color:var(--text-3);border-style:dashed}
 .kb-state.unknown{color:var(--text-3);border-style:dotted}
+/* 「检索库」= Dify 工作流知识检索节点覆盖到的库；新建对话能检索到 */
+.kb-state.retr{color:var(--brand);border-color:var(--brand-2);background:var(--brand-soft)}
+.btn.pri-txt{color:var(--brand);border-color:var(--brand-2)}
+.btn.pri-txt svg{stroke:var(--brand)}
+.kbm-list{margin:6px 0 10px 18px;padding:0;font-size:13px;line-height:1.9}
+.kbm-list li{margin:0}
+.kbm-fg select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:9px;
+  background:var(--panel-2);color:var(--text);font-size:13.5px;font-family:inherit}
+.kbm-fg select:focus{outline:none;border-color:var(--brand-2);background:var(--panel)}
 
 /* 文档行 */
 .kb-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);

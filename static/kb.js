@@ -59,6 +59,8 @@
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
     arch: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>',
+    // 归档到检索库：方框 + 向右的入箭头
+    retr: '<svg viewBox="0 0 24 24"><path d="M4 5h6v14H4z"/><path d="M14 9h6M17 6l3 3-3 3"/></svg>',
     refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.4"/><path d="M20 4v7h-7"/></svg>',
     info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/></svg>'
   };
@@ -71,8 +73,19 @@
     cur: null,         // 当前知识库
     docs: { page: 1, limit: 20, total: 0, hasMore: false, status: '', keyword: '', items: [] },
     curDoc: null,
-    segs: { page: 1, limit: 10, total: 0, hasMore: false, keyword: '', items: [] }
+    segs: { page: 1, limit: 10, total: 0, hasMore: false, keyword: '', items: [] },
+    // 「检索库」：Dify 工作流「知识检索」节点覆盖到的知识库
+    retrieval: { loaded: false, ids: [], items: [] }
   };
+
+  function isRetrieval(id) {
+    return st.retrieval.ids.indexOf(id) >= 0;
+  }
+  function retrievalTitle() {
+    return (st.retrieval.items || []).map(function (x) {
+      return x.exists ? x.name : (x.id.slice(0, 8) + '…（已失效）');
+    }).join('、');
+  }
 
   /* ---------------- 请求 ---------------- */
   async function api(path, opts) {
@@ -135,6 +148,30 @@
     return modal({ title: title, body: '<p>' + body + '</p>', confirmText: confirmText || '确定', danger: !!danger });
   }
 
+  /* 纯展示型弹窗（不返回 Promise），用于「正在归档…」这类长任务，
+     任务结束时由调用方 close()，期间用户点「隐藏」也能先收起。 */
+  function busyModal(title, html) {
+    var mask = document.createElement('div');
+    mask.className = 'kb-modal-mask';
+    mask.innerHTML =
+      '<div class="kb-modal">' +
+        '<div class="kbm-head"><b>' + esc(title) + '</b></div>' +
+        '<div class="kbm-body">' + html + '</div>' +
+        '<div class="kbm-foot"><button class="btn gho" data-act="hide">隐藏</button></div>' +
+      '</div>';
+    document.body.appendChild(mask);
+    requestAnimationFrame(function () { mask.classList.add('on'); });
+    function close() {
+      mask.classList.remove('on');
+      setTimeout(function () { if (mask.parentNode) mask.parentNode.removeChild(mask); }, 180);
+    }
+    mask.addEventListener('click', function (e) {
+      var act = e.target && e.target.getAttribute && e.target.getAttribute('data-act');
+      if (act === 'hide' || e.target === mask) close();
+    });
+    return { close: close };
+  }
+
   /* ---------------- 状态徽章 ---------------- */
   var STATE_TEXT = {
     enabled: '已启用', partial: '部分禁用', disabled: '已禁用', empty: '空知识库', unknown: '状态未知'
@@ -188,6 +225,7 @@
     $('kbMask').classList.add('on');
     $('kbDrawer').classList.add('on');
     st.view = 'ds';
+    loadRetrieval();
     loadDs();
   }
   function close() {
@@ -250,7 +288,145 @@
   }
   function emptyBox(html) { $('kbBody').innerHTML = '<div class="kb-empty">' + html + '</div>'; }
 
-  /* ---------------- ① 知识库列表 ---------------- */
+  /* ---------------- 检索库清单 ---------------- */
+  async function loadRetrieval() {
+    try {
+      var d = await api('/api/kb/retrieval');
+      var r = d.retrieval || {};
+      st.retrieval.ids = r.ids || [];
+      st.retrieval.items = r.datasets || [];
+      st.retrieval.loaded = true;
+    } catch (e) {
+      st.retrieval.loaded = true;   // 失败也标记，避免反复重试
+      st.retrieval.ids = [];
+      st.retrieval.items = [];
+    }
+    if (st.view === 'ds' && st.ds.items.length) { renderDs(); }
+  }
+
+  async function setRetrieval(dsId, on, btn) {
+    busy(btn, true);
+    try {
+      var d = await api('/api/kb/retrieval', {
+        method: 'POST',
+        body: JSON.stringify(on ? { add: dsId } : { remove: dsId })
+      });
+      var r = d.retrieval || {};
+      st.retrieval.ids = r.ids || [];
+      st.retrieval.items = r.datasets || [];
+      st.retrieval.loaded = true;
+      toast(on ? '已列入检索库：新建对话就能检索到它' : '已移出检索清单');
+      renderDs();
+    } catch (e) { toast(e.message, true); }
+    finally { busy(btn, false); }
+  }
+
+  /* ---------------- 归档到检索库 ---------------- */
+  function targetOptions(excludeId) {
+    return (st.retrieval.items || []).filter(function (x) {
+      return x.id !== excludeId;
+    }).map(function (x) {
+      var label = (x.exists ? x.name : x.id.slice(0, 8) + '…') +
+        (x.exists ? '（' + (x.documentCount || 0) + ' 篇文档）' : '（已失效）');
+      return '<option value="' + esc(x.id) + '"' + (x.exists ? '' : ' disabled') + '>' + esc(label) + '</option>';
+    }).join('');
+  }
+
+  async function archDialog(opt) {
+    // opt: { mode: 'ds' | 'doc', ds, doc }
+    if (!st.retrieval.loaded) await loadRetrieval();
+    var srcName = opt.mode === 'doc' ? (opt.doc ? opt.doc.name : '') : (opt.ds ? opt.ds.name : '');
+    var usable = (st.retrieval.items || []).filter(function (x) {
+      return x.exists && x.id !== (opt.ds ? opt.ds.id : '');
+    });
+    if (!usable.length) {
+      await modal({
+        title: '没有可用的检索库',
+        body: '<p>「检索库」是 Dify 工作流里<strong>知识检索节点覆盖到的知识库</strong>，' +
+          '只有归档到这些库里，新建对话才检索得到。</p>' +
+          '<p>当前清单：' + (st.retrieval.items.length
+            ? esc(retrievalTitle())
+            : '<em class="dim">（空）</em>') + '</p>' +
+          '<p class="kbm-note">' + ICON.info + ' 请在知识库列表里选一个库，点「编辑」勾选「列入检索库」，' +
+          '或直接点卡片上的「设为检索库」。</p>',
+        confirmText: '知道了'
+      });
+      return;
+    }
+
+    var body =
+      '<p>' + (opt.mode === 'doc' ? '把文档 ' : '把知识库 ') +
+        '<strong>' + esc(srcName) + '</strong>' +
+        (opt.mode === 'doc' ? '' : ' 里<strong>全部文档</strong>') +
+        ' 的内容归档（复制）进一个检索库，之后新建对话即可检索到。</p>' +
+      '<label class="kbm-fg"><span>目标检索库</span>' +
+        '<select id="kbaTarget">' + targetOptions(opt.ds ? opt.ds.id : '') + '</select>' +
+        '<em class="kbm-tip">只有清单里的库会被工作流检索到。</em></label>' +
+      '<label class="kbm-chk"><input type="checkbox" id="kbaDel"> 归档后删除源' +
+        (opt.mode === 'doc' ? '文档' : '文档（源知识库保留）') + '（搬走，而不是复制）</label>' +
+      '<p class="kbm-note">' + ICON.info +
+        ' 只搬「启用中」的分段；目标库里<strong>同名文档会被覆盖更新</strong>，所以重复归档是安全的。' +
+        '归档后 Dify 要重建索引，可能要 10~60 秒。</p>';
+
+    var ok = await modal({
+      title: '归档到检索库',
+      body: body,
+      confirmText: '开始归档'
+    });
+    if (!ok) return;
+
+    var target = $('kbaTarget').value;
+    if (!target) { toast('请选择目标检索库', true); return; }
+    var delSrc = $('kbaDel').checked;
+
+    var url = opt.mode === 'doc'
+      ? '/api/kb/' + encodeURIComponent(opt.ds.id) + '/documents/' + encodeURIComponent(opt.doc.id) + '/archive-to'
+      : '/api/kb/' + encodeURIComponent(opt.ds.id) + '/archive-to';
+
+    var w = busyModal('正在归档',
+      '<p>正在把内容写入 <strong>' + esc(targetName(target)) + '</strong> 并重建索引…</p>' +
+      '<p class="kbm-note"><span class="sp"></span>请稍候，不要关闭页面。</p>');
+
+    try {
+      var d = await api(url, { method: 'POST', body: JSON.stringify({ target: target, deleteSource: delSrc }) });
+      w.close();
+      showArchResult(d);
+      if (st.view === 'ds') await loadDs();
+      else if (st.view === 'docs') await loadDocs();
+    } catch (e) {
+      w.close();
+      toast(e.message, true);
+    }
+  }
+
+  function targetName(id) {
+    var x = (st.retrieval.items || []).filter(function (y) { return y.id === id; })[0];
+    return x ? x.name : id.slice(0, 8);
+  }
+
+  function showArchResult(d) {
+    var arc = d.archived || [];
+    var skip = d.skipped || [];
+    var lines = arc.map(function (a) {
+      return '<li>' + esc(a.name) + ' —— ' + a.segments + ' 段 / ' + a.chars + ' 字' +
+        (a.skippedSegments ? '<em class="dim">（跳过 ' + a.skippedSegments + ' 条未启用分段）</em>' : '') +
+        ' · ' + (a.indexingStatus === 'completed' ? '索引已完成' : ('索引 ' + esc(a.indexingStatus))) + '</li>';
+    }).join('');
+    var skLines = skip.map(function (s) {
+      return '<li>' + esc(s.name) + ' —— <em class="dgr-txt">' + esc(s.reason) + '</em></li>';
+    }).join('');
+
+    var body =
+      '<p>已归档到检索库 <strong>' + esc((d.target || {}).name || '') + '</strong>' +
+      (d.deletedSource ? '，并已从源库删除' : '') + '。</p>' +
+      (lines ? '<ul class="kbm-list">' + lines + '</ul>' : '') +
+      (skLines ? '<p class="dgr-txt">未归档：</p><ul class="kbm-list">' + skLines + '</ul>' : '') +
+      '<p class="kbm-note">' + ICON.info + ' 现在去<strong>新建对话</strong>提问相关内容，就能检索到了。</p>';
+
+    modal({ title: '归档完成', body: body, confirmText: '好' });
+  }
+
+
   async function loadDs() {
     render(); loading('正在读取知识库列表…');
     try {
@@ -273,7 +449,8 @@
       setCount('');
       return;
     }
-    setCount('共 ' + st.ds.total + ' 个');
+    setCount('共 ' + st.ds.total + ' 个' +
+      (st.retrieval.ids.length ? ' · 检索库 ' + st.retrieval.ids.length + ' 个' : ''));
     $('kbBody').innerHTML = st.ds.items.map(function (d) {
       var rt = d.retrieval || {};
       var meta = [
@@ -295,7 +472,9 @@
         '<div class="kbc-top">' +
           '<span class="kbc-ic">' + ICON.kb + '</span>' +
           '<div class="kbc-title">' +
-            '<div class="kbc-name">' + esc(d.name) + stateBadge(d) + '</div>' +
+            '<div class="kbc-name">' + esc(d.name) +
+              (isRetrieval(d.id) ? '<span class="kb-state retr">检索库</span>' : '') +
+              stateBadge(d) + '</div>' +
             '<div class="kbc-desc">' + (d.description ? esc(d.description) : '<em class="dim">无描述</em>') + '</div>' +
           '</div>' +
           '<div class="kbc-nums">' +
@@ -310,6 +489,8 @@
         '</div>' +
         '<div class="kbc-acts">' +
           '<button class="btn gho sm" data-act="docs" data-id="' + esc(d.id) + '">' + ICON.doc + '文档管理</button>' +
+          (isRetrieval(d.id) ? '' :
+            '<button class="btn gho sm pri-txt" data-act="arch" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="edit" data-id="' + esc(d.id) + '">' + ICON.edit + '编辑</button>' +
           '<button class="btn gho sm" data-act="' + (canEnable ? 'enable' : 'disable') + '" data-id="' + esc(d.id) + '"' +
             (canEnable || canDisable ? '' : ' disabled') + '>' + ICON.power + (canEnable ? '启用' : '禁用') + '</button>' +
@@ -364,6 +545,8 @@
         '</div>' +
         '<div class="kbr-acts">' +
           '<button class="btn gho sm" data-act="segs" data-id="' + esc(d.id) + '">' + ICON.seg + '分段</button>' +
+          (st.cur && isRetrieval(st.cur.id) ? '' :
+            '<button class="btn gho sm pri-txt" data-act="archdoc" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="' + (d.enabled ? 'dodisable' : 'doenable') + '" data-id="' + esc(d.id) + '"' +
             (d.archived ? ' disabled' : '') + '>' + ICON.power + (d.enabled ? '禁用' : '启用') + '</button>' +
           '<button class="btn gho sm" data-act="' + (d.archived ? 'unarchive' : 'archive') + '" data-id="' + esc(d.id) + '">' +
@@ -436,6 +619,8 @@
       '<label class="kbm-chk"><input type="checkbox" id="kbeThrOn"' + (rt.scoreThresholdEnabled ? ' checked' : '') + '> 启用相似度阈值过滤</label>' +
       '<label class="kbm-chk"><input type="checkbox" id="kbeRr"' + (rt.rerankingEnable ? ' checked' : '') + '> 启用 Rerank 重排' +
         (rt.rerankingModel ? '<em class="dim">（' + esc(rt.rerankingModel) + '）</em>' : '') + '</label>' +
+      '<label class="kbm-chk"><input type="checkbox" id="kbeRetr"' + (isRetrieval(d.id) ? ' checked' : '') +
+        '> 列入「检索库」<em class="dim">（新建对话能检索到这个库；需与 Dify 工作流的检索范围一致）</em></label>' +
       '<p class="kbm-note">' + ICON.info + ' 检索方式为「' + esc(rt.searchMethod || 'semantic_search') +
         '」、向量模型 ' + esc(d.embeddingModel || '—') + ' 保持不变。改动只影响后续检索。</p>';
 
@@ -446,6 +631,8 @@
       return {
         name: name,
         description: $('kbeDesc').value.trim(),
+        retrievalList: $('kbeRetr').checked,
+        wasRetrievalList: isRetrieval(d.id),
         retrieval: {
           topK: parseInt($('kbeTopK').value, 10) || 3,
           scoreThresholdEnabled: $('kbeThrOn').checked,
@@ -457,9 +644,21 @@
   }
 
   async function saveDs(d, patch, btn) {
+    // retrievalList 是前端侧的登记项（哪些库在工作流的检索范围里），不走 Dify 的 PATCH
+    var listFlag = patch.retrievalList;
+    var listChanged = (listFlag !== undefined) && (listFlag !== patch.wasRetrievalList);
+    delete patch.retrievalList;
+    delete patch.wasRetrievalList;
     busy(btn, true, '保存中');
     try {
       await api('/api/kb/' + encodeURIComponent(d.id), { method: 'PATCH', body: JSON.stringify(patch) });
+      if (listChanged) {
+        await api('/api/kb/retrieval', {
+          method: 'POST',
+          body: JSON.stringify(listFlag ? { add: d.id } : { remove: d.id })
+        });
+        await loadRetrieval();
+      }
       toast('已保存');
       await loadDs();
     } catch (e) {
@@ -481,11 +680,13 @@
       }
       if (act === 'docs') { openDocs(ds); return; }
       if (act === 'enable' || act === 'disable') { toggleDs(ds, act === 'enable', btn); return; }
+      if (act === 'arch' && ds) { archDialog({ mode: 'ds', ds: ds }); return; }
       if (act === 'del') { delDs(ds, btn); return; }
 
       // 文档级
       var doc = st.docs.items.filter(function (x) { return x.id === id; })[0];
       if (act === 'segs' && doc) { openSegs(doc); return; }
+      if (act === 'archdoc' && doc) { archDialog({ mode: 'doc', ds: st.cur, doc: doc }); return; }
       if (act === 'doenable' || act === 'dodisable') { setDocEnabled(doc, act === 'doenable', btn); return; }
       if (act === 'archive' || act === 'unarchive') { setDocArchived(doc, act === 'archive', btn); return; }
       if (act === 'docdel') { delDoc(doc, btn); return; }
@@ -704,5 +905,9 @@
   /* ---------------- 对外 ---------------- */
   window.KB = { open: open, close: close };
   // 供 DOM 级自检脚本（verify_kb_ui.mjs）调用；不影响正常使用。
-  window.__kb = { modal: modal, confirmBox: confirmBox, esc: esc, api: api, state: st, render: render };
+  window.__kb = {
+    modal: modal, confirmBox: confirmBox, esc: esc, api: api, state: st, render: render,
+    loadRetrieval: loadRetrieval, archDialog: archDialog, isRetrieval: isRetrieval,
+    setRetrieval: setRetrieval, busyModal: busyModal
+  };
 })();
