@@ -141,6 +141,21 @@ def wait_doc_idle(ds_id, doc_id, timeout=180):
     return False
 
 
+def status_patch(path, body, token, tries=10, gap=3.0):
+    """改文档/分段状态：撞上「is being indexed」就退避重试。
+
+    Dify 在重新索引期间会拒绝状态变更（400 Document ... is being indexed）。
+    首次跑时偶发（机器忙时索引慢），这里统一兜住，避免自检假红。
+    """
+    st, obj = None, {}
+    for _ in range(tries):
+        st, obj = api("PATCH", path, body, token=token)
+        if st == 200 or "being indexed" not in str(obj.get("error", "")):
+            return st, obj
+        time.sleep(gap)
+    return st, obj
+
+
 def retrieve(ds_id, query):
     """直接问 Dify 这个库能不能召回（禁用后应为 0 条）。"""
     st, obj = dify("POST", "/datasets/%s/retrieve" % ds_id, {"query": query}, timeout=120)
@@ -222,6 +237,7 @@ def main():
         return 1
     doc_id = doc["document"]["id"]
     chk(wait_indexed(ds_id, doc_id), "文档索引完成", doc.get("document", {}).get("indexing_status"))
+    wait_doc_idle(ds_id, doc_id)   # indexing_status=completed 后 display_status 可能还是 indexing
 
     recs, _ = retrieve(ds_id, PROBE)
     chk(recs is not None and len(recs) > 0, "基线：启用状态下能召回到内容（%s 条）" % (len(recs) if recs else 0))
@@ -293,20 +309,22 @@ def main():
         "阈值开关可关闭（改回后检索断言才可靠）", obj)
 
     # ---------- 6. 文档：归档 / 取消归档 / 禁用 / 启用 ----------
-    st, obj = api("PATCH", "/api/kb/%s/documents/%s" % (ds_id, doc_id), {"archived": True}, token=token)
-    chk(st == 200 and obj.get("action") == "archive", "归档文档")
+    docpath = "/api/kb/%s/documents/%s" % (ds_id, doc_id)
+    wait_doc_idle(ds_id, doc_id)
+    st, obj = status_patch(docpath, {"archived": True}, token)
+    chk(st == 200 and obj.get("action") == "archive", "归档文档", obj)
     time.sleep(1)
     st, obj = api("GET", "/api/kb/%s/documents?status=archived" % ds_id, token=token)
     chk(len(obj.get("documents") or []) == 1, "「已归档」筛选能看到它", obj.get("total"))
-    st, obj = api("PATCH", "/api/kb/%s/documents/%s" % (ds_id, doc_id), {"archived": False}, token=token)
-    chk(st == 200 and obj.get("action") == "un_archive", "取消归档")
+    st, obj = status_patch(docpath, {"archived": False}, token)
+    chk(st == 200 and obj.get("action") == "un_archive", "取消归档", obj)
     wait_doc_idle(ds_id, doc_id)
 
-    st, obj = api("PATCH", "/api/kb/%s/documents/%s" % (ds_id, doc_id), {"enabled": False}, token=token)
+    st, obj = status_patch(docpath, {"enabled": False}, token)
     chk(st == 200 and obj.get("action") == "disable", "禁用单个文档", obj)
     st, obj = api("GET", "/api/kb/%s/documents?status=disabled" % ds_id, token=token)
     chk(len(obj.get("documents") or []) == 1, "「已禁用」筛选能看到它", obj.get("total"))
-    st, obj = api("PATCH", "/api/kb/%s/documents/%s" % (ds_id, doc_id), {"enabled": True}, token=token)
+    st, obj = status_patch(docpath, {"enabled": True}, token)
     chk(st == 200 and obj.get("action") == "enable", "启用单个文档", obj)
     wait_doc_idle(ds_id, doc_id)
 
