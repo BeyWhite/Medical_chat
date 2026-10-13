@@ -3,6 +3,13 @@
    三层导航：知识库列表 → 文档列表 → 分段列表
    能力：编辑（名称/描述/检索参数）、删除、禁用/启用、文档与分段的增删改
    接口：全部走本机后端 /api/kb*，由后端转发 Dify Service API（知识库密钥不下发浏览器）
+
+   ⚠️ 按钮配色规范（本抽屉内只有三色，别再引入第四种）：
+     ① 主操作  = `btn pri sm`      品牌蓝实心：进下一层（文档管理 / 分段）、新增分段
+     ② 次要操作 = `btn gho sm`      灰色描边：编辑、启用/禁用、归档、搜索、清空、翻页、取消
+     ③ 破坏性  = `btn gho sm dgr-txt` 橙色：删除（弹窗里的确认按钮用 `btn dgr` 实心橙）
+   不要再用 `pri-txt`（青色描边）：它只是"接口设置"里给新增连接留的样式。
+   详见 README「按钮配色」一节与 dev/verify_btn_ui.mjs。
    ========================================================================= */
 (function () {
   'use strict';
@@ -280,7 +287,7 @@
         '<div class="kb-search">' + ICON.search +
           '<input id="kbKw" type="text" placeholder="搜索知识库名称…" value="' + esc(st.ds.keyword) + '">' +
         '</div>' +
-        '<button class="btn pri sm" id="kbSearchBtn">搜索</button>' +
+        '<button class="btn gho sm" id="kbSearchBtn">搜索</button>' +
         (st.ds.keyword ? '<button class="btn gho sm" id="kbClearBtn">清空</button>' : '') +
         '<span class="kb-count" id="kbCount"></span>';
       $('kbFoot').innerHTML = pagerHtml(st.ds);
@@ -549,9 +556,9 @@
           '<span class="kbc-time">更新于 ' + fmtTime(d.updatedAt) + '</span>' +
         '</div>' +
         '<div class="kbc-acts">' +
-          '<button class="btn sm pri" data-act="docs" data-id="' + esc(d.id) + '">' + ICON.doc + '文档管理</button>' +
+          '<button class="btn pri sm" data-act="docs" data-id="' + esc(d.id) + '">' + ICON.doc + '文档管理</button>' +
           (isRetr ? '' :
-            '<button class="btn gho sm pri-txt" data-act="arch" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
+            '<button class="btn gho sm" data-act="arch" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="edit" data-id="' + esc(d.id) + '">' + ICON.edit + '编辑</button>' +
           '<button class="btn gho sm" data-act="' + (canEnable ? 'enable' : 'disable') + '" data-id="' + esc(d.id) + '"' +
             (canEnable || canDisable ? '' : ' disabled') + '>' + ICON.power + (canEnable ? '启用' : '禁用') + '</button>' +
@@ -607,9 +614,9 @@
           '</div>' +
         '</div>' +
         '<div class="kbr-acts">' +
-          '<button class="btn sm pri" data-act="segs" data-id="' + esc(d.id) + '">' + ICON.seg + '分段</button>' +
+          '<button class="btn pri sm" data-act="segs" data-id="' + esc(d.id) + '">' + ICON.seg + '分段</button>' +
           (st.cur && isRetrieval(st.cur.id) ? '' :
-            '<button class="btn gho sm pri-txt" data-act="archdoc" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
+            '<button class="btn gho sm" data-act="archdoc" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="' + (d.enabled ? 'dodisable' : 'doenable') + '" data-id="' + esc(d.id) + '"' +
             (d.archived ? ' disabled' : '') + '>' + ICON.power + (d.enabled ? '禁用' : '启用') + '</button>' +
           '<button class="btn gho sm" data-act="' + (d.archived ? 'unarchive' : 'archive') + '" data-id="' + esc(d.id) + '">' +

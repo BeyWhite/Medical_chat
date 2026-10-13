@@ -22,6 +22,7 @@
   --warn-bg:#fff8ec;
   --warn-border:#f5dfb8;
   --danger:#c2410c;
+  --danger-soft:#fdf1ea;   /* 危险按钮的悬停底色 */
   --user-bubble:linear-gradient(135deg,#0e7490,#0891b2);
   --shadow:0 1px 2px rgba(15,39,51,.04),0 8px 24px -12px rgba(15,39,51,.18);
   --radius:15px;
@@ -59,6 +60,7 @@ html[data-theme="dark"]{
   --warn-bg:#2a2110;
   --warn-border:#4d3b16;
   --danger:#fb923c;
+  --danger-soft:rgba(251,146,60,.14);
   --user-bubble:linear-gradient(135deg,#0e7490,#0b5f77);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 28px -14px rgba(0,0,0,.6);
 }
@@ -452,8 +454,10 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
 .btn.sm .sp{width:12px;height:12px;border-width:1.7px}
 .btn.dgr{background:var(--danger);color:#fff}
 .btn.dgr:hover{filter:brightness(1.08)}
+/* 危险（删除类）按钮：默认就带橙色描边，悬停底色同色系（原来是灰框 + 棕黄底，跟文字不同调） */
 .dgr-txt{color:var(--danger)!important}
-.dgr-txt:hover{border-color:var(--danger)!important;background:var(--warn-bg)!important}
+.btn.dgr-txt{border-color:var(--danger)!important}
+.dgr-txt:hover{border-color:var(--danger)!important;background:var(--danger-soft)!important}
 .dim{color:var(--text-3);font-style:normal}
 .btn .sp{width:13px;height:13px;border:2px solid rgba(255,255,255,.45);border-top-color:currentColor;
   border-radius:50%;animation:sp .7s linear infinite;flex:0 0 auto}
@@ -570,8 +574,11 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
 .kb-state.unknown{color:var(--text-3);border-style:dotted}
 .kb-state.retr{color:var(--brand);border-color:var(--brand-2);background:var(--brand-soft)}
 .kb-state.retr::before{content:'★';margin-right:4px;font-size:10px;vertical-align:1px}
+/* 品牌色描边按钮：现在只用于「接口设置 → ＋ 新增」连接。
+   注意 hover 必须自己声明，否则会被 .btn.gho:hover 的灰边框顶掉（看起来像"颜色跳了一下"）。 */
 .btn.pri-txt{color:var(--brand);border-color:var(--brand-2)}
 .btn.pri-txt svg{stroke:var(--brand)}
+.btn.pri-txt:hover{border-color:var(--brand-2);background:var(--brand-soft)}
 .kbm-list{margin:6px 0 10px 18px;padding:0;font-size:13px;line-height:1.9}
 .kbm-list li{margin:0}
 .kbm-fg select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:9px;

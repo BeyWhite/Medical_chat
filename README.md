@@ -353,15 +353,19 @@ python verify_apps.py
 连通性自测 `/api/apps/probe`、删除保护（正在用的那条不能删）、保存设置不影响全局项，
 最后**切回原连接并删掉临时连接**，断言 `config.json` 回到跑之前的样子。
 
-**④ 多套工作流连接 · 前端交互（约 2 秒，需要 node + jsdom）**
+**④ 前端交互（dev，需要 node + jsdom；四个脚本都不用起后端）**
 
 ```bash
-JSDOM_PATH=<jsdom 路径> node dev/verify_apps_ui.mjs
+export JSDOM_PATH=<jsdom 路径>      # Windows 例：C:/Users/xxx/.workbuddy/binaries/node/workspace/node_modules/jsdom
+node dev/verify_back_ui.mjs         # 返回按钮逐级返回（29 项）
+node dev/verify_seg_ui.mjs          # 新增分段 / 关键词 chips / 长文折叠（27 项）
+node dev/verify_btn_ui.mjs          # 按钮配色规范（36 项，见「维护须知 → 按钮配色」）
+node dev/verify_archive_ui.mjs      # 归档到检索库的弹窗与请求体（21 项）
+node dev/verify_delete_flow.mjs     # 删除确认弹窗（8 项）
+node dev/verify_apps_ui.mjs         # 多套工作流连接的下拉与保存（24 项）
 ```
 
-在 jsdom 里真实加载 `index.html` + `app.js`，覆盖 24 项：下拉渲染与「使用中」标记、
-切换后表单跟随、保存时先 `POST /api/apps` 再 `POST /api/settings` 的请求体、
-密钥留空不提交 apiKey、「＋ 新增」清空表单、删除保护与提示文案。
+这些是开发期工具，**分发包里可以整个 `dev/` 删掉**。
 
 **⑤ 问答 + 文件上传（约 8~10 分钟）**
 
@@ -377,16 +381,6 @@ bash verify.sh          # Windows 上用 Git Bash 执行；macOS / Linux 直接 
 > - `verify.sh` 用**临时数据库**（`MQ50_DB`）跑自己的服务实例，**不会清空你的账号**；
 > - 它会自动选一个**空闲端口**，所以就算你正开着服务也不冲突；
 > - 两个脚本跑完都会**自动删掉**在 Dify 里真实建的临时知识库。
-
-**④ 删除流程回归（dev，需要 node + jsdom）**
-
-```bash
-npm i jsdom
-node dev/verify_kb_ui.mjs
-```
-
-覆盖「危险操作确认弹窗」的一整套交互（删库要输库名、输错不放行、取消可关、回车提交、
-请求地址正确等 33 项）。这是开发期工具，**分发包里可以整个 `dev/` 删掉**。
 
 ---
 
@@ -480,6 +474,27 @@ Dify 不允许修改已禁用的分段，先在编辑弹窗里勾上「启用这
 - **改完 `.bat` 一定要真机跑一遍**：`bash dev/verify_bats.sh`
   （它会检查是否含非 ASCII，并真实启停一轮）。
 
+### 按钮配色（知识库抽屉内只有三色）
+
+知识库管理里的按钮曾经混了 4 种颜色（蓝色实心 / 青色描边 / 灰色描边 / 橙色文字），
+同一个「搜索」在两个页面还是两种颜色。2026-10-13 统一成**方案 A · 语义三色**：
+
+| 类型 | 类名 | 颜色 | 用在哪 |
+|---|---|---|---|
+| 主操作 | `btn pri sm` | 品牌蓝实心 | 进下一层（文档管理 / 分段）、新增分段 |
+| 次要操作 | `btn gho sm` | 灰色描边 | 编辑、启用/禁用、归档/取消归档、归档到检索库、搜索、清空、翻页、弹窗「取消」 |
+| 破坏性 | `btn gho sm dgr-txt` | 橙色 | 删除三兄弟（删库 / 删文档 / 删分段）；弹窗里的确认按钮用实心 `btn dgr` |
+
+规则：
+
+- **不要再往知识库界面里引入第 4 种颜色**。「归档到检索库」原先用 `pri-txt`（青色描边）已并回灰色，
+  靠 `ICON.retr` 图标和卡片上的「★ 检索库」徽章区分——`pri-txt` 现在只留给「接口设置 → ＋ 新增」。
+- **危险按钮的框线和悬停底色必须同色系**：`--danger` + `--danger-soft`
+  （原来悬停用的是棕黄 `--warn-bg`，跟橙字不同调）。深色主题单独给了 `--danger-soft` 值。
+- **给 `.btn.xxx` 加 hover 时务必自己声明 hover 规则**：`.btn.gho:hover` 会改边框色，
+  优先级相同的情况下按"后定义者胜"，否则会出现"鼠标移上去颜色跳一下"。
+- 改完跑 `node dev/verify_btn_ui.mjs`（36 项）——它同时断言 DOM 里的类名组合和 `style.css` 里的变量/规则。
+
 ### 其它约定
 
 | 项 | 约定 |
@@ -487,6 +502,7 @@ Dify 不允许修改已禁用的分段，先在编辑弹窗里勾上「启用这
 | 端口占用 | 绑定前必须先用 `port_in_use()` 探测。Windows 下 `allow_reuse_address` 默认开启，两个进程能同时绑同一端口，表现为"启动了但访问异常" |
 | 密钥判断 | 用 `_key_is_real()` 识别占位符，别用 `startswith("app-xxx")` 这种脆弱写法 |
 | 危险按钮 | 不要给按钮加 `disabled` 又不做灰化——按钮有固定背景色时浏览器不会变灰，用户会以为能点。要用"可点 + 点击时校验 + 明确提示" |
+| 按钮配色 | 知识库抽屉内只允许三色（蓝实心 / 灰描边 / 橙）。加新按钮前先看上一节「按钮配色」，别引入第 4 种颜色 |
 | 弹窗层级 | `toast`(200) > 弹窗遮罩(120) > 抽屉(95)，改动前先确认提示不会被盖住 |
 | 弹窗字段 id | 弹窗内有固定 id（`kbmReq`/`kbeName`/`kseContent`），同一时刻只允许一个弹窗，否则 `getElementById` 会取到上一个弹窗的元素 |
 | 自检 | `verify.sh` 会清空 `data/app.db`（本地账号会丢）；日常回归用 `verify_kb.py` |
