@@ -36,6 +36,13 @@
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
+  /* 大数字更好读：12345 → 1.2万 */
+  function fmtNum(n) {
+    n = Number(n) || 0;
+    if (n >= 10000) return (n / 10000).toFixed(n >= 100000 ? 0 : 1) + ' 万';
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
   function busy(btn, on, textWhile) {
     if (!btn) return;
     if (on) {
@@ -62,7 +69,10 @@
     // 归档到检索库：方框 + 向右的入箭头
     retr: '<svg viewBox="0 0 24 24"><path d="M4 5h6v14H4z"/><path d="M14 9h6M17 6l3 3-3 3"/></svg>',
     refresh: '<svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.4"/><path d="M20 4v7h-7"/></svg>',
-    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/></svg>'
+    info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/></svg>',
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+    inbox: '<svg viewBox="0 0 24 24"><path d="M3 13h4l1.5 2.5h7L17 13h4"/><path d="M5.5 5h13l2.5 8v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5L5.5 5Z"/></svg>',
+    layers: '<svg viewBox="0 0 24 24"><path d="m12 3 8.5 4.6L12 12.2 3.5 7.6 12 3Z"/><path d="m3.5 12.4 8.5 4.6 8.5-4.6"/></svg>'
   };
 
   /* ---------------- 状态 ---------------- */
@@ -103,6 +113,11 @@
   /* ---------------- 通用弹窗 ---------------- */
   function modal(opts) {
     return new Promise(function (resolve) {
+      // 同一时刻只允许一个弹窗：旧弹窗（含刚关闭、还在等 180ms 移除的）立即清掉，
+      // 否则两个弹窗会各带一份 #ksnContent / #kbeName 等固定 id，getElementById 读串台。
+      Array.prototype.forEach.call(document.querySelectorAll('.kb-modal-mask'), function (m) {
+        if (m.parentNode) m.parentNode.removeChild(m);
+      });
       var mask = document.createElement('div');
       mask.className = 'kb-modal-mask';
       var need = !!opts.requireText;
@@ -198,10 +213,7 @@
       '<div class="kb-foot" id="kbFoot"></div>';
 
     $('kbClose').addEventListener('click', close);
-    $('kbBack').addEventListener('click', function () {
-      if (st.view === 'segs') { st.view = 'docs'; render(); }
-      else if (st.view === 'docs') { st.view = 'ds'; render(); }
-    });
+    $('kbBack').addEventListener('click', goBack);
     $('kbRefresh').addEventListener('click', function () {
       if (st.view === 'ds') loadDs();
       else if (st.view === 'docs') loadDocs();
@@ -233,12 +245,37 @@
     $('kbDrawer').classList.remove('on');
   }
 
+  /* 返回上一级（分段 → 文档 → 知识库）
+     注意：必须真正重拉数据，让 #kbBody 重绘；
+     只调 render() 的话面包屑换了、正文不动，用户看到的就是「点了没反应」。 */
+  function goBack() {
+    if (st.view === 'segs') {
+      st.view = 'docs';
+      if (st.cur) loadDocs();
+      else { st.view = 'ds'; loadDs(); }   // 父级丢了就一路退回根
+      return;
+    }
+    if (st.view === 'docs') {
+      st.view = 'ds';
+      loadDs();
+    }
+    // ds 视图没有上一级（此时按钮本身也是隐藏的）
+  }
+
   /* ---------------- 渲染外壳 ---------------- */
+  function crumbHtml(main, sub) {
+    return '<span class="kb-crumb-ic">' + ICON.layers + '</span>' +
+      '<span class="kb-crumb-main" title="' + esc(main) + '">' + esc(main) + '</span>' +
+      (sub ? '<span class="kb-crumb-sub">' + esc(sub) + '</span>' : '');
+  }
+
   function render() {
     var back = $('kbBack');
     back.hidden = (st.view === 'ds');
+    back.title = st.view === 'segs' ? '返回文档列表' : (st.view === 'docs' ? '返回知识库列表' : '返回');
+    back.setAttribute('aria-label', back.title);
     if (st.view === 'ds') {
-      $('kbCrumb').textContent = '知识库管理';
+      $('kbCrumb').innerHTML = crumbHtml('知识库管理', '');
       $('kbToolbar').innerHTML =
         '<div class="kb-search">' + ICON.search +
           '<input id="kbKw" type="text" placeholder="搜索知识库名称…" value="' + esc(st.ds.keyword) + '">' +
@@ -248,7 +285,7 @@
         '<span class="kb-count" id="kbCount"></span>';
       $('kbFoot').innerHTML = pagerHtml(st.ds);
     } else if (st.view === 'docs') {
-      $('kbCrumb').textContent = (st.cur ? st.cur.name : '') + ' · 文档';
+      $('kbCrumb').innerHTML = crumbHtml(st.cur ? st.cur.name : '', '文档');
       $('kbToolbar').innerHTML =
         '<div class="kb-seg">' +
           ['', 'available', 'disabled', 'archived'].map(function (s) {
@@ -259,12 +296,13 @@
         '<span class="kb-count" id="kbCount"></span>';
       $('kbFoot').innerHTML = pagerHtml(st.docs);
     } else {
-      $('kbCrumb').textContent = (st.curDoc ? st.curDoc.name : '') + ' · 分段';
+      $('kbCrumb').innerHTML = crumbHtml(st.curDoc ? st.curDoc.name : '', '分段');
       $('kbToolbar').innerHTML =
+        '<button class="btn pri sm" id="kbSegAdd" title="在这个文档里新增一个分段">' + ICON.plus + '新增分段</button>' +
         '<div class="kb-search">' + ICON.search +
           '<input id="kbKw2" type="text" placeholder="搜索分段内容…" value="' + esc(st.segs.keyword) + '">' +
         '</div>' +
-        '<button class="btn pri sm" id="kbSegSearch">搜索</button>' +
+        '<button class="btn gho sm" id="kbSegSearch">搜索</button>' +
         (st.segs.keyword ? '<button class="btn gho sm" id="kbSegClear">清空</button>' : '') +
         '<span class="kb-count" id="kbCount"></span>';
       $('kbFoot').innerHTML = pagerHtml(st.segs);
@@ -284,9 +322,28 @@
   function setCount(txt) { var el = $('kbCount'); if (el) el.textContent = txt || ''; }
 
   function loading(text) {
-    $('kbBody').innerHTML = '<div class="kb-empty"><span class="sp"></span>' + esc(text || '加载中…') + '</div>';
+    $('kbBody').innerHTML =
+      '<div class="kb-skel-wrap">' +
+        '<div class="kb-skel-tip"><span class="spin"></span>' + esc(text || '加载中…') + '</div>' +
+        [0, 1, 2].map(function () {
+          return '<div class="kb-skel">' +
+            '<div class="skl-line w35"></div><div class="skl-line"></div><div class="skl-line w70"></div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
   }
-  function emptyBox(html) { $('kbBody').innerHTML = '<div class="kb-empty">' + html + '</div>'; }
+
+  /* 空态：图标 + 标题 + 说明（+ 可选操作），比一行灰字更好认 */
+  function emptyBox(icon, title, text, extra) {
+    $('kbBody').innerHTML =
+      '<div class="kb-empty">' +
+        '<div class="kbe-ic">' + (icon || ICON.inbox) + '</div>' +
+        '<b>' + (title || '') + '</b>' +
+        (text ? '<p>' + text + '</p>' : '') +
+        (extra || '') +
+      '</div>';
+  }
+  function errorBox(msg) { emptyBox(ICON.inbox, '读取失败', esc(msg), ''); }
 
   /* ---------------- 检索库清单 ---------------- */
   async function loadRetrieval() {
@@ -439,13 +496,16 @@
       render();
       renderDs();
     } catch (e) {
-      emptyBox('<b>读取失败</b><p>' + esc(e.message) + '</p>');
+      errorBox(e.message);
     }
   }
 
   function renderDs() {
     if (!st.ds.items.length) {
-      emptyBox(st.ds.keyword ? '没有匹配「' + esc(st.ds.keyword) + '」的知识库' : '还没有知识库。上传一份知识文件就会自动创建。');
+      emptyBox(ICON.kb, st.ds.keyword ? '没有找到知识库' : '还没有知识库',
+        st.ds.keyword
+          ? '没有匹配「' + esc(st.ds.keyword) + '」的知识库，换个词试试，或点「清空」。'
+          : '在问答页上传一份知识文件，就会自动建库；也可以点右上角刷新。');
       setCount('');
       return;
     }
@@ -467,19 +527,20 @@
 
       var canEnable = d.state === 'disabled' || d.state === 'partial';
       var canDisable = d.state === 'enabled' || d.state === 'partial';
+      var isRetr = isRetrieval(d.id);
 
-      return '<div class="kb-card" data-ds="' + esc(d.id) + '">' +
+      return '<div class="kb-card' + (isRetr ? ' retr' : '') + '" data-ds="' + esc(d.id) + '">' +
         '<div class="kbc-top">' +
           '<span class="kbc-ic">' + ICON.kb + '</span>' +
           '<div class="kbc-title">' +
             '<div class="kbc-name">' + esc(d.name) +
-              (isRetrieval(d.id) ? '<span class="kb-state retr">检索库</span>' : '') +
+              (isRetr ? '<span class="kb-state retr">检索库</span>' : '') +
               stateBadge(d) + '</div>' +
             '<div class="kbc-desc">' + (d.description ? esc(d.description) : '<em class="dim">无描述</em>') + '</div>' +
           '</div>' +
           '<div class="kbc-nums">' +
-            '<b>' + d.documentCount + '</b><span>文档</span>' +
-            '<b>' + (d.wordCount || 0) + '</b><span>字数</span>' +
+            '<div class="kbc-stat"><b>' + (d.documentCount || 0) + '</b><span>文档</span></div>' +
+            '<div class="kbc-stat"><b>' + fmtNum(d.wordCount || 0) + '</b><span>字数</span></div>' +
           '</div>' +
         '</div>' +
         '<div class="kbc-meta">' +
@@ -488,8 +549,8 @@
           '<span class="kbc-time">更新于 ' + fmtTime(d.updatedAt) + '</span>' +
         '</div>' +
         '<div class="kbc-acts">' +
-          '<button class="btn gho sm" data-act="docs" data-id="' + esc(d.id) + '">' + ICON.doc + '文档管理</button>' +
-          (isRetrieval(d.id) ? '' :
+          '<button class="btn sm pri" data-act="docs" data-id="' + esc(d.id) + '">' + ICON.doc + '文档管理</button>' +
+          (isRetr ? '' :
             '<button class="btn gho sm pri-txt" data-act="arch" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="edit" data-id="' + esc(d.id) + '">' + ICON.edit + '编辑</button>' +
           '<button class="btn gho sm" data-act="' + (canEnable ? 'enable' : 'disable') + '" data-id="' + esc(d.id) + '"' +
@@ -514,7 +575,7 @@
       render();
       renderDocs();
     } catch (e) {
-      emptyBox('<b>读取失败</b><p>' + esc(e.message) + '</p>');
+      errorBox(e.message);
     }
   }
 
@@ -527,7 +588,7 @@
 
   function renderDocs() {
     if (!st.docs.items.length) {
-      emptyBox('这里还没有文档。');
+      emptyBox(ICON.doc, '这里还没有文档', '在问答页上传知识文件会自动入库，也可以点右上角刷新。');
       setCount('共 ' + st.docs.total + ' 个');
       return;
     }
@@ -536,15 +597,17 @@
       return '<div class="kb-row" data-doc="' + esc(d.id) + '">' +
         '<span class="kbr-ic">' + ICON.doc + '</span>' +
         '<div class="kbr-main">' +
-          '<div class="kbr-name">' + esc(d.name) + docStatusText(d) + '</div>' +
-          '<div class="kbr-sub">' + (d.wordCount || 0) + ' 字 · ' + (d.tokens || 0) + ' tokens' +
+          '<div class="kbr-name">' +
+            (d.position != null ? '<span class="kbr-no">#' + d.position + '</span>' : '') +
+            esc(d.name) + docStatusText(d) + '</div>' +
+          '<div class="kbr-sub">' + fmtNum(d.wordCount || 0) + ' 字 · ' + (d.tokens || 0) + ' tokens' +
             (d.hitCount ? ' · 命中 ' + d.hitCount + ' 次' : '') +
             ' · ' + fmtTime(d.createdAt) +
             (d.error ? ' · <em class="dgr-txt">' + esc(String(d.error).slice(0, 60)) + '</em>' : '') +
           '</div>' +
         '</div>' +
         '<div class="kbr-acts">' +
-          '<button class="btn gho sm" data-act="segs" data-id="' + esc(d.id) + '">' + ICON.seg + '分段</button>' +
+          '<button class="btn sm pri" data-act="segs" data-id="' + esc(d.id) + '">' + ICON.seg + '分段</button>' +
           (st.cur && isRetrieval(st.cur.id) ? '' :
             '<button class="btn gho sm pri-txt" data-act="archdoc" data-id="' + esc(d.id) + '">' + ICON.retr + '归档到检索库</button>') +
           '<button class="btn gho sm" data-act="' + (d.enabled ? 'dodisable' : 'doenable') + '" data-id="' + esc(d.id) + '"' +
@@ -572,23 +635,42 @@
       render();
       renderSegs();
     } catch (e) {
-      emptyBox('<b>读取失败</b><p>' + esc(e.message) + '</p>');
+      errorBox(e.message);
     }
   }
 
+  var SEG_CLAMP_CHARS = 260;   // 超过这个长度先折叠，避免一屏只有一条分段
+
   function renderSegs() {
+    var why = segBlockedReason();
+    var warn = why ? '<div class="kb-warn">' + ICON.info + '<span>' + esc(why) + '</span></div>' : '';
+    setCount('共 ' + st.segs.total + ' 段');
     if (!st.segs.items.length) {
-      emptyBox(st.segs.keyword ? '没有匹配的分段' : '这个文档还没有分段。');
-      setCount('共 ' + st.segs.total + ' 段');
+      var hint = st.segs.keyword
+        ? '没有匹配「' + esc(st.segs.keyword) + '」的分段，换个词试试，或点「清空」。'
+        : '这个文档还没有分段 —— 点上面的「＋ 新增分段」就能手工加一条。';
+      $('kbBody').innerHTML = warn +
+        '<div class="kb-empty">' +
+          '<div class="kbe-ic">' + ICON.seg + '</div>' +
+          '<b>' + (st.segs.keyword ? '没有找到分段' : '还没有分段') + '</b>' +
+          '<p>' + hint + '</p>' +
+        '</div>';
       return;
     }
-    setCount('共 ' + st.segs.total + ' 段');
-    $('kbBody').innerHTML = st.segs.items.map(function (s) {
-      return '<div class="kb-seg-item' + (s.enabled ? '' : ' off') + '" data-seg="' + esc(s.id) + '">' +
+    $('kbBody').innerHTML = warn + st.segs.items.map(function (s) {
+      var kw = s.keywords || [];
+      var cls = 'kb-seg-item' + (s.enabled ? '' : ' off');
+      if (s.position === 1) cls += ' first';
+      var long = String(s.content || '').length > SEG_CLAMP_CHARS;
+      return '<div class="' + cls + '" data-seg="' + esc(s.id) + '">' +
         '<div class="kbs-head">' +
           '<span class="kbs-no">#' + (s.position != null ? s.position : '-') + '</span>' +
           (s.enabled ? '<span class="kb-state enabled">启用中</span>' : '<span class="kb-state disabled">已禁用</span>') +
-          '<span class="kbs-wc">' + (s.wordCount || 0) + ' 字' + (s.hitCount ? ' · 命中 ' + s.hitCount : '') + '</span>' +
+          (s.status && s.status !== 'completed' && s.enabled
+            ? '<span class="kb-state partial">' + esc(s.status) + '</span>' : '') +
+          '<span class="kbs-wc">' + (s.wordCount || 0) + ' 字' +
+            (s.tokens ? ' · ' + s.tokens + ' tokens' : '') +
+            (s.hitCount ? ' · 命中 ' + s.hitCount + ' 次' : '') + '</span>' +
           '<div class="kbs-acts">' +
             '<button class="btn gho sm" data-act="segedit" data-id="' + esc(s.id) + '">' + ICON.edit + '编辑</button>' +
             '<button class="btn gho sm" data-act="' + (s.enabled ? 'segdisable' : 'segenable') + '" data-id="' + esc(s.id) + '">' +
@@ -596,7 +678,12 @@
             '<button class="btn gho sm dgr-txt" data-act="segdel" data-id="' + esc(s.id) + '">' + ICON.trash + '删除</button>' +
           '</div>' +
         '</div>' +
-        '<pre class="kbs-content">' + esc(s.content) + '</pre>' +
+        (kw.length ? '<div class="kbs-kw">' + kw.map(function (k) {
+          return '<span class="kbs-chip">' + esc(k) + '</span>';
+        }).join('') + '</div>' : '') +
+        '<pre class="kbs-content' + (long ? ' clamp' : '') + '">' + esc(s.content) + '</pre>' +
+        (long ? '<button class="kbs-more" data-act="segtoggle" data-id="' + esc(s.id) + '">展开全文</button>' : '') +
+        (s.error ? '<div class="kbs-err">' + esc(String(s.error).slice(0, 120)) + '</div>' : '') +
       '</div>';
     }).join('');
   }
@@ -692,6 +779,15 @@
       if (act === 'docdel') { delDoc(doc, btn); return; }
 
       // 分段级
+      if (act === 'segtoggle') {
+        var p = btn.closest('.kb-seg-item');
+        var pre = p ? p.querySelector('.kbs-content') : null;
+        if (pre) {
+          var on = pre.classList.toggle('clamp');
+          btn.textContent = on ? '展开全文' : '收起';
+        }
+        return;
+      }
       var seg = st.segs.items.filter(function (x) { return x.id === id; })[0];
       if (act === 'segedit' && seg) { editSeg(seg, btn); return; }
       if (act === 'segenable' || act === 'segdisable') { setSegEnabled(seg, act === 'segenable', btn); return; }
@@ -709,6 +805,8 @@
 
   function onToolbarClick(e) {
     var t = e.target;
+    // 按钮里带 svg 时 e.target 可能是 svg/path，用 closest 找按钮本身
+    if (t.closest && t.closest('#kbSegAdd')) { addSegDialog(); return; }
     if (t.id === 'kbSearchBtn') {
       var kw = $('kbKw');
       st.ds.keyword = kw ? kw.value.trim() : '';
@@ -842,6 +940,76 @@
     } catch (e) { toast(e.message, true); busy(btn, false); }
   }
 
+  /* ---------------- 分段：新增 ---------------- */
+  /* Dify 只允许在「索引完成 + 启用中」的文档里加分段，先在这里拦一道，给出能看懂的原因 */
+  function segBlockedReason() {
+    if (!st.curDoc) return '请先进入一个文档';
+    if (st.curDoc.archived) return '这个文档已归档 —— 请先返回文档列表点「取消归档」，再新增分段';
+    if (!st.curDoc.enabled) return '这个文档已被禁用 —— 请先返回文档列表把它「启用」，再新增分段';
+    var ix = st.curDoc.indexingStatus;
+    if (ix && ix !== 'completed') return '这个文档还在建立索引（' + ix + '）—— 等它变成「可用」后再新增分段';
+    return '';
+  }
+
+  /* 想一次加多条时，用单独一行 --- 分隔，比反复开弹窗顺手 */
+  function splitBlocks(text) {
+    return String(text || '').split(/\n[ \t]*-{3,}[ \t]*\n/)
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s.length > 0; });
+  }
+
+  function addSegDialog() {
+    var why = segBlockedReason();
+    if (why) { toast(why, true); return; }
+
+    var qa = !!(st.curDoc && st.curDoc.docForm === 'qa_model');
+    var body =
+      (qa
+        ? '<label class="kbm-fg"><span>问题</span>' +
+            '<textarea id="ksnContent" rows="3" class="mono" placeholder="例如：院前急救的基本原则是什么？"></textarea></label>' +
+          '<label class="kbm-fg"><span>答案</span>' +
+            '<textarea id="ksnAnswer" rows="4" class="mono" placeholder="这条问题对应的答案"></textarea></label>'
+        : '<label class="kbm-fg"><span>分段内容</span>' +
+            '<textarea id="ksnContent" rows="9" class="mono" placeholder="直接粘贴一段内容即可。想一次加多条，就用单独一行 --- 把它们隔开。"></textarea>' +
+            '<em class="kbm-tip">每一段都会成为一条独立分段，检索时单独命中。</em></label>') +
+      '<label class="kbm-fg"><span>关键词（逗号分隔，可留空）</span>' +
+        '<input type="text" id="ksnKw" placeholder="例如：高原病, 吸氧">' +
+        '<em class="kbm-tip">给关键词检索用；留空只走语义检索，一般也能命中。</em></label>' +
+      '<p class="kbm-note">' + ICON.info +
+        ' 新增后 Dify 会立刻为它建立索引（通常几秒）。这个动作<strong>只往知识库加内容</strong>，不影响工作流。</p>';
+
+    modal({ title: qa ? '新增问答对' : '新增分段', body: body, confirmText: '创建并索引' })
+      .then(function (ok) {
+        if (!ok) return;
+        var content = ($('ksnContent') || {}).value || '';
+        if (!content.trim()) { toast('分段内容不能为空', true); return; }
+        var answer = qa ? (($('ksnAnswer') || {}).value || '') : '';
+        var keywords = (($('ksnKw') || {}).value || '').split(/[,，\s]+/).filter(function (s) { return s; });
+
+        var payload;
+        if (qa) {
+          payload = { content: content.trim(), keywords: keywords };
+          if (answer.trim()) payload.answer = answer.trim();
+        } else {
+          var blocks = splitBlocks(content);
+          payload = (blocks.length > 1)
+            ? { segments: blocks.map(function (c) { return { content: c, keywords: keywords }; }) }
+            : { content: content.trim(), keywords: keywords };
+        }
+        createSeg(payload);
+      });
+  }
+
+  async function createSeg(payload) {
+    var n = payload.segments ? payload.segments.length : 1;
+    try {
+      var d = await api('/api/kb/' + encodeURIComponent(st.cur.id) + '/documents/' + encodeURIComponent(st.curDoc.id) +
+        '/segments', { method: 'POST', body: JSON.stringify(payload) });
+      toast('已新增 ' + (d.created || n) + ' 条分段，正在建立索引');
+      await loadSegs();
+    } catch (e) { toast(e.message, true); }
+  }
+
   /* ---------------- 分段：编辑 / 启停 / 删除 ---------------- */
   function editSeg(seg, btn) {
     var kws = seg.keywords || [];
@@ -908,6 +1076,8 @@
   window.__kb = {
     modal: modal, confirmBox: confirmBox, esc: esc, api: api, state: st, render: render,
     loadRetrieval: loadRetrieval, archDialog: archDialog, isRetrieval: isRetrieval,
-    setRetrieval: setRetrieval, busyModal: busyModal
+    setRetrieval: setRetrieval, busyModal: busyModal,
+    addSegDialog: addSegDialog, createSeg: createSeg, segBlockedReason: segBlockedReason,
+    splitBlocks: splitBlocks, renderSegs: renderSegs
   };
 })();

@@ -708,12 +708,12 @@
   }
   async function healthCheck() {
     setStat('wait', '检测中…');
-    $('brandSub').textContent = '问答5.0 · 连接中…';
+    $('brandSub').textContent = '连接中…';
     try {
       var d = await api('/api/health');
       if (d.ok) {
         setStat('ok', '已连接 · ' + (d.name || '应用'));
-        $('brandSub').textContent = (d.name || '问答5.0') + ' · ' + (d.mode || d.appType || '');
+        $('brandSub').textContent = (d.name || 'Dify 应用') + ' · ' + (d.mode || d.appType || '');
         $('badgeMode').textContent = (d.mode === 'advanced-chat' || d.appType === 'chatflow') ? '医学知识库' : (d.appType || '应用');
         return d;
       }
@@ -761,22 +761,64 @@
   function toggleInputVar() {
     $('fgInputVar').hidden = $('cfgType').value !== 'workflow';
   }
+
+  /* ---------- 多套「工作流连接」 ---------- */
+  state.apps = [];
+  state.activeAppId = '';
+  state.appDraftId = '';        // 正在编辑的连接 id（'' = 新增中）
+
+  function findApp(id) {
+    for (var i = 0; i < state.apps.length; i++) if (state.apps[i].id === id) return state.apps[i];
+    return null;
+  }
+  function renderAppSelect() {
+    var sel = $('cfgApp');
+    var html = state.apps.map(function (a) {
+      var label = (a.name || '未命名连接') + (a.hasKey ? '' : '（未填密钥）') +
+        (a.id === state.activeAppId ? ' · 使用中' : '');
+      return '<option value="' + esc(a.id) + '">' + esc(label) + '</option>';
+    });
+    if (state.appDraftId === '') html += '<option value="__new__">＋ 新连接（未保存）</option>';
+    sel.innerHTML = html || '<option value="__new__">＋ 新连接（未保存）</option>';
+    sel.value = state.appDraftId === '' ? '__new__' : state.appDraftId;
+    if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+  }
+  function fillAppForm(app) {
+    $('cfgAppName').value = app ? (app.name || '') : '';
+    $('cfgBase').value = (app && app.baseUrl) || state.settings.globalBaseUrl || 'http://127.0.0.1/v1';
+    $('cfgKey').value = '';
+    $('keyMasked').textContent = (app && app.apiKeyMasked) || '未设置';
+    $('cfgType').value = (app && app.appType) || state.settings.appType || 'chatflow';
+    $('cfgInputVar').value = (app && app.inputVar) || 'query';
+    renderQuickBases($('cfgBase').value);
+    toggleInputVar();
+    // 「删除」按钮常驻可点（不用 disabled —— 有显式底色的按钮禁用后浏览器不变灰，
+    // 会被误以为可点）；真正的拦截放在 deleteApp() 里，点了给明确提示。
+    $('btnAppDel').title = !app ? '新连接还没保存' : (app.id === state.activeAppId ? '正在使用的连接不能删除' : '删除这条连接');
+  }
+  function selectApp(id) {
+    state.appDraftId = id === '__new__' ? '' : id;
+    fillAppForm(findApp(state.appDraftId));
+  }
+  async function loadApps() {
+    var d = await api('/api/apps');
+    state.apps = d.apps || [];
+    state.activeAppId = d.activeApp || '';
+    state.appDraftId = state.activeAppId || (state.apps[0] && state.apps[0].id) || '';
+    renderAppSelect();
+    fillAppForm(findApp(state.appDraftId));
+  }
+
   async function openDrawer() {
     try {
       var d = await api('/api/settings');
       state.settings = d;
-      $('cfgBase').value = d.baseUrl || '';
-      $('cfgKey').value = '';
-      $('keyMasked').textContent = d.apiKeyMasked || '未设置';
       $('cfgDsKey').value = '';
       $('dsKeyMasked').textContent = d.datasetIdMasked || '未设置';
-      $('cfgType').value = d.appType || 'chatflow';
-      $('cfgInputVar').value = d.inputVar || 'query';
       $('cfgInputs').value = JSON.stringify(d.extraInputs || {}, null, 0) === '{}' ? '{}' : JSON.stringify(d.extraInputs, null, 2);
       $('cfgStream').checked = d.stream !== false;
       $('cfgTimeout').value = d.timeout || 300;
-      renderQuickBases(d.baseUrl || '');
-      toggleInputVar();
+      await loadApps();
       $('mask').classList.add('on'); $('drawer').classList.add('on');
     } catch (e) { toast(e.message, true); }
   }
@@ -786,25 +828,56 @@
   async function saveSettings() {
     var base = $('cfgBase').value.trim();
     if (!base) { toast('请填写 API 访问点'); return; }
+    var name = $('cfgAppName').value.trim();
+    if (!name) { toast('请先给这条工作流连接起个名字'); $('cfgAppName').focus(); return; }
     var iv = $('cfgInputs').value.trim() || '{}';
     try { JSON.parse(iv); } catch (e) { toast('inputs 不是合法 JSON'); return; }
     try {
+      // 1) 先把表单内容存成一条连接，并设为「当前使用」
+      var body = {
+        name: name,
+        baseUrl: base,
+        apiKey: $('cfgKey').value.trim(),
+        appType: $('cfgType').value,
+        inputVar: $('cfgInputVar').value.trim() || 'query',
+        activate: true
+      };
+      if (state.appDraftId) body.id = state.appDraftId;
+      var r = await api('/api/apps', { method: 'POST', body: JSON.stringify(body) });
+      state.apps = r.apps || [];
+      state.activeAppId = r.activeApp || '';
+      state.appDraftId = state.activeAppId;
+      // 2) 再保存全局项（知识库密钥 / 流式 / 超时 / 附加 inputs）
       var d = await api('/api/settings', {
         method: 'POST',
         body: JSON.stringify({
-          baseUrl: base,
-          apiKey: $('cfgKey').value.trim(),
-          datasetApiKey: $('cfgDsKey').value.trim(),
-          appType: $('cfgType').value,
-          inputVar: $('cfgInputVar').value.trim() || 'query',
+          activeApp: state.activeAppId,
           extraInputs: iv,
+          datasetApiKey: $('cfgDsKey').value.trim(),
           stream: $('cfgStream').checked,
           timeout: parseInt($('cfgTimeout').value, 10) || 300
         })
       });
       closeDrawer();
-      toast(d.healthy ? ('已保存 · 连接正常（' + d.name + '）') : '已保存，但连接失败', !d.healthy);
+      toast(d.healthy
+        ? ('已切换到「' + (d.activeName || name) + '」· 连接正常')
+        : ('已保存「' + (d.activeName || name) + '」，但连接失败'), !d.healthy);
       healthCheck();
+    } catch (e) { toast(e.message, true); }
+  }
+  async function deleteApp() {
+    var app = findApp(state.appDraftId);
+    if (!app) { toast('先选一条已保存的连接'); return; }
+    if (app.id === state.activeAppId) { toast('这是正在使用的连接，请先切到别的连接再删'); return; }
+    if (!window.confirm('确定删除连接「' + (app.name || app.id) + '」？\n（只删除本页保存的连接信息，不影响 Dify 里的应用本身）')) return;
+    try {
+      var r = await api('/api/apps/' + encodeURIComponent(app.id), { method: 'DELETE' });
+      state.apps = r.apps || [];
+      state.activeAppId = r.activeApp || '';
+      state.appDraftId = state.activeAppId || (state.apps[0] && state.apps[0].id) || '';
+      renderAppSelect();
+      fillAppForm(findApp(state.appDraftId));
+      toast('已删除该连接');
     } catch (e) { toast(e.message, true); }
   }
 
@@ -1021,6 +1094,16 @@
     $('mask').addEventListener('click', closeDrawer);
     $('stat').addEventListener('click', healthCheck);
     $('cfgType').addEventListener('change', toggleInputVar);
+    $('cfgApp').addEventListener('change', function () { selectApp($('cfgApp').value); });
+    $('btnAppNew').addEventListener('click', function () {
+      state.appDraftId = '';
+      renderAppSelect();
+      fillAppForm(null);
+      $('cfgAppName').value = '';
+      $('cfgAppName').focus();
+      toast('填好名称与 App Key，点「保存并重连」即可新增一条连接');
+    });
+    $('btnAppDel').addEventListener('click', deleteApp);
     $('quickBases').addEventListener('click', function (e) {
       var b = e.target && e.target.closest ? e.target.closest('.qbtn') : null;
       if (b) { $('cfgBase').value = b.getAttribute('data-base'); renderQuickBases(b.getAttribute('data-base')); }

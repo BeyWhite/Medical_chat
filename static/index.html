@@ -76,7 +76,7 @@
         </div>
         <div class="brand-txt">
           <h1>医学知识问答</h1>
-          <p id="brandSub">问答5.0 · 连接中…</p>
+          <p id="brandSub">连接中…</p>
         </div>
       </div>
       <button class="new-chat" id="newChat">
@@ -169,16 +169,33 @@
   </div>
   <div class="dr-body">
     <div class="fg">
+      <label>当前连接的工作流</label>
+      <div class="appbar">
+        <select id="cfgApp" title="选择本页要连接哪个 Dify 工作流"></select>
+        <button type="button" class="btn sm gho pri-txt" id="btnAppNew">＋ 新增</button>
+        <button type="button" class="btn sm gho dgr-txt" id="btnAppDel">删除</button>
+      </div>
+      <div class="desc">在这里选择本页要连接<b>哪个 Dify 工作流</b>，改完点右下角「<b>保存并重连</b>」生效（顶栏状态点会立即复检）。
+        列表里没有？点「＋ 新增」，填个名称和该应用的 <code>App Key</code> 就行。知识库密钥（<code>dataset-</code>）全局共用，不随工作流切换改变。</div>
+    </div>
+
+    <div class="fg">
+      <label>连接名称</label>
+      <input type="text" id="cfgAppName" placeholder="例如：问答5.0 / 智能问答02 / 急救知识库问答">
+      <div class="desc">只用来在下拉里认出这条连接，随便起。</div>
+    </div>
+
+    <div class="fg">
       <label>API 访问点（Base URL）</label>
       <input type="text" id="cfgBase" placeholder="http://127.0.0.1/v1">
       <div class="quick" id="quickBases"></div>
-      <div class="desc">Dify 与本页面同机部署时填 <code>http://127.0.0.1/v1</code>；若 Dify 在另一台机器，填那台的局域网地址，例如 <code>http://192.168.x.x/v1</code>。</div>
+      <div class="desc">属于<b>当前所选连接</b>。Dify 与本页面同机部署时填 <code>http://127.0.0.1/v1</code>；若 Dify 在另一台机器，填那台的局域网地址，例如 <code>http://192.168.x.x/v1</code>。</div>
     </div>
 
     <div class="fg">
       <label>API 密钥（App Key）</label>
       <input type="password" id="cfgKey" placeholder="留空表示不修改">
-      <div class="desc">当前：<code id="keyMasked">—</code>。以 <code>app-</code> 开头。密钥仅保存在本机服务端的 <code>config.json</code> 中，<b>不会下发到浏览器</b>。</div>
+      <div class="desc">属于<b>当前所选连接</b>。当前：<code id="keyMasked">—</code>。以 <code>app-</code> 开头。密钥仅保存在本机服务端的 <code>config.json</code> 中，<b>不会下发到浏览器</b>。</div>
     </div>
 
     <div class="fg">
@@ -193,7 +210,7 @@
         <option value="chatflow">对话流 Chatflow（/chat-messages，带上下文）</option>
         <option value="workflow">工作流 Workflow（/workflows/run，单次执行）</option>
       </select>
-      <div class="desc">「问答5.0」实测为 <b>advanced-chat（对话流）</b>，保持默认即可。</div>
+      <div class="desc">属于<b>当前所选连接</b>。保存后会随「工作流」一起记到这条连接上（留空 = 沿用全局默认）。「问答5.0」实测为 <b>advanced-chat（对话流）</b>，保持默认即可。</div>
     </div>
 
     <div class="fg" id="fgInputVar" hidden>

@@ -407,6 +407,63 @@ def main():
                   {"content": "   "}, token=token)
     chk(st == 400, "空分段内容被拒绝（%s）" % st)
 
+    # ---------- 7.5 新增分段（转发 Dify「Create Chunks」） ----------
+    st, obj = api("GET", "/api/kb/%s/documents/%s/segments?limit=100" % (ds_id, doc_id), token=token)
+    n0 = obj.get("total") or 0
+    new_text = "高原旅行前应做哪些准备？需要携带乙酰唑胺等预防药物，并避免剧烈运动。"
+    st, obj = api("POST", "/api/kb/%s/documents/%s/segments" % (ds_id, doc_id),
+                  {"content": new_text, "keywords": ["高原", "乙酰唑胺"]}, token=token)
+    chk(st == 200 and obj.get("ok") and obj.get("created") == 1, "新增 1 条分段（%s）" % st, obj)
+    new_id = ((obj.get("segments") or [{}])[0]).get("id")
+    chk(bool(new_id), "返回新建分段的 id：%s" % new_id)
+
+    found, total_now = None, None
+    t0 = time.time()
+    while time.time() - t0 < 60:
+        st, obj = api("GET", "/api/kb/%s/documents/%s/segments?limit=100" % (ds_id, doc_id), token=token)
+        segs = obj.get("segments") or []
+        total_now = obj.get("total")
+        hit = [s for s in segs if s["id"] == new_id]
+        if hit and total_now == n0 + 1:
+            found = hit[0]
+            break
+        time.sleep(2)
+    chk(found is not None, "新分段出现在列表里、分段数 +1（%s -> %s）" % (n0, total_now))
+    if found:
+        chk(found.get("content", "").strip() == new_text.strip(), "新分段内容与提交一致")
+        chk("乙酰唑胺" in (found.get("keywords") or []), "新分段关键词已入索引：%s" % found.get("keywords"))
+        chk(found.get("position") is not None, "新分段有 position=%s" % found.get("position"))
+
+    n, dt = retrieve_wait(ds_id, "高原旅行前准备 乙酰唑胺 预防药物", True, timeout=120)
+    chk(n is not None and n > 0, "★ 新增的分段能被检索到（%s 条，%.0fs 内达成）" % (n, dt), "实得 %s 条" % n)
+
+    # 批量新增（一次多条）
+    st, obj = api("POST", "/api/kb/%s/documents/%s/segments" % (ds_id, doc_id),
+                  {"segments": [{"content": "自检批量甲：高海拔脑水肿的早期识别。"},
+                                {"content": "自检批量乙：高压氧舱的适应症与禁忌。"}]}, token=token)
+    chk(st == 200 and obj.get("created") == 2, "一次批量新增 2 条（created=%s）" % (obj.get("created")))
+
+    st, obj = api("GET", "/api/kb/%s/documents/%s/segments?limit=100" % (ds_id, doc_id), token=token)
+    chk((obj.get("total") or 0) == n0 + 3, "分段总数变成 n0+3（%s -> %s）" % (n0, obj.get("total")))
+
+    # 入参校验
+    st, obj = api("POST", "/api/kb/%s/documents/%s/segments" % (ds_id, doc_id), {}, token=token)
+    chk(st == 400, "没有 content 被拒（%s）" % st)
+    st, obj = api("POST", "/api/kb/%s/documents/%s/segments" % (ds_id, doc_id),
+                  {"segments": []}, token=token)
+    chk(st == 400, "空 segments 数组被拒（%s）" % st)
+
+    # 清理新增的 3 条，后面的断言不受影响
+    st, obj = api("GET", "/api/kb/%s/documents/%s/segments?limit=100" % (ds_id, doc_id), token=token)
+    junk = [s["id"] for s in (obj.get("segments") or [])
+            if s.get("content", "").startswith("自检批量") or s.get("content", "") == new_text]
+    bad = 0
+    for sid in junk:
+        st, o2 = api("DELETE", "/api/kb/%s/documents/%s/segments/%s" % (ds_id, doc_id, sid), token=token)
+        if st != 200:
+            bad += 1
+    chk(len(junk) == 3 and bad == 0, "清理新增的 3 条分段（失败 %d 个）" % bad)
+
     # ---------- 8. 删除文档 ----------
     st, obj = api("DELETE", "/api/kb/%s/documents/%s" % (ds_id, doc_id), token=token)
     chk(st == 200 and obj.get("ok"), "删除文档", obj)

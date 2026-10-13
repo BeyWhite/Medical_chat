@@ -41,6 +41,33 @@ from urllib.parse import urlparse, unquote, quote, parse_qs
 import urllib.request
 import urllib.error
 
+
+# ---------------------------------------------------------------- 代理
+# 让「本机 / 内网」的请求**直连**，不受系统代理影响。
+#
+# 背景：Windows / macOS 上如果配了 HTTP_PROXY（企业代理、抓包工具、调试代理…），
+# urllib 会把 `http://127.0.0.1/v1` 这样的本机地址也交给代理。
+# 代理一关掉就报 `WinError 10061 由于目标计算机积极拒绝，无法连接`，
+# 在页面上表现为「连接 Dify 工作流失败」——但 Dify 其实好好地跑在本机。
+# Dify 与本服务同机（或同局域网）时，正确做法就是直连。
+def _install_local_direct_opener():
+    _PRIVATE_RE = re.compile(r"^172\.(1[6-9]|2\d|3[01])\.")
+
+    class _LocalDirectProxy(urllib.request.ProxyHandler):
+        def proxy_open(self, req, proxy, type):
+            host = (urlparse(req.full_url).hostname or "").lower()
+            if (host in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "")
+                    or host.startswith(("10.", "192.168.", "169.254."))
+                    or _PRIVATE_RE.match(host)):
+                # 返回 None = 这个 handler 不处理 → 上层按原始 URL 直连
+                return None
+            return super().proxy_open(req, proxy, type)
+
+    urllib.request.install_opener(urllib.request.build_opener(_LocalDirectProxy()))
+
+
+_install_local_direct_opener()
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -58,6 +85,7 @@ DEFAULT_CONFIG = {
     "_说明": "问答5.0 前端配置：改完这里直接重启 server.py 即可生效，也可以在网页的「接口设置」里在线修改。",
     "server": {"host": "0.0.0.0", "port": 8001},
     "dify": {
+        # ---- 全局默认值：某个连接没写自己的值时回退到这里 ----
         "base_url": "http://127.0.0.1/v1",
         "api_key": "app-xxxxxxxxxxxxxxxxxxxxxxxx",
         "dataset_api_key": "dataset-xxxxxxxxxxxxxxxxxxxxxxxx",
@@ -70,6 +98,15 @@ DEFAULT_CONFIG = {
         # 由「知识库管理」页维护（列表里的「设为检索库」/编辑弹窗），
         # 与工作流图保持一致 —— 工作流改过检索范围后请在页面上同步。
         "retrieval_dataset_ids": [],
+        # ---- 多套「工作流连接」：前端「接口设置」里可下拉切换 ----
+        # 每条 = 一个 Dify 应用的连接参数（名称 + App Key + 可选的访问点/类型/输入变量）。
+        # api_key 为空表示这一条还没填密钥；base_url/app_type/input_var 为空表示沿用上面的全局值。
+        "apps": [
+            # {"id": "a1", "name": "问答5.0", "api_key": "app-xxx", "base_url": "",
+            #  "app_type": "chatflow", "input_var": "query", "extra_inputs": {}}
+        ],
+        # 当前启用哪一条连接（值 = apps[].id）；为空时取 apps 的第一条。
+        "active_app": "",
     },
     "session": {"ttl_hours": 72},
 }
@@ -162,14 +199,15 @@ def _key_is_real(key, prefix):
 
 
 def dify_ready():
-    d = CONFIG.get("dify") or {}
+    """当前启用的「工作流连接」是否配好了（地址 + 有效 App Key）。"""
+    d = effective_dify()
     base = (d.get("base_url") or "").strip()
     return bool(base) and _key_is_real(d.get("api_key"), "app-")
 
 
 def dataset_ready():
     d = CONFIG.get("dify") or {}
-    base = (d.get("base_url") or "").strip()
+    base = (effective_dify().get("base_url") or "").strip()
     return bool(base) and _key_is_real(d.get("dataset_api_key"), "dataset-")
 
 
@@ -194,6 +232,209 @@ def set_retrieval_ids(ids):
 
 
 # --------------------------------------------------------------------------
+# 多套「工作流连接」（apps）
+#
+# 一条连接 = 一个 Dify 应用的连接参数。前端「接口设置」里下拉切换，
+# 切换后 /api/chat、/api/upload、/api/health 都改用该连接的 base_url + api_key。
+# base_url / app_type / input_var / extra_inputs 为空时回退到 dify 下的全局默认值，
+# 这样只填「名称 + App Key」就能加一条连接，其余沿用全局。
+# --------------------------------------------------------------------------
+APP_FIELDS = ("name", "api_key", "base_url", "app_type", "input_var")
+
+
+def _app_id_exists(aid):
+    return any(a.get("id") == aid for a in (CONFIG.get("dify") or {}).get("apps") or [])
+
+
+def new_app_id():
+    """生成一个短 id（避免与已有重复）。"""
+    while True:
+        aid = uuid.uuid4().hex[:10]
+        if not _app_id_exists(aid):
+            return aid
+
+
+def get_app(aid):
+    """按 id 取连接；aid 为空则取「当前启用」那条。"""
+    d = CONFIG.get("dify") or {}
+    apps = d.get("apps") or []
+    if not apps:
+        return None
+    if not aid:
+        aid = d.get("active_app") or ""
+    if not aid:
+        return apps[0]
+    for a in apps:
+        if a.get("id") == aid:
+            return a
+    return None
+
+
+def list_apps():
+    return (CONFIG.get("dify") or {}).get("apps") or []
+
+
+def set_active_app(aid):
+    d = CONFIG.setdefault("dify", {})
+    if aid and not _app_id_exists(aid):
+        return False
+    d["active_app"] = aid or ""
+    return True
+
+
+def upsert_app(data, activate=False):
+    """新增 / 更新一条连接，返回 (app, created)。
+
+    data: {id?, name?, apiKey?, baseUrl?, appType?, inputVar?, extraInputs?}
+    密钥字段为空表示「不修改」（新增时 = 留空）。
+    """
+    d = CONFIG.setdefault("dify", {})
+    apps = d.setdefault("apps", [])
+    aid = (data.get("id") or "").strip()
+    app = None
+    created = False
+    if aid:
+        for a in apps:
+            if a.get("id") == aid:
+                app = a
+                break
+    if app is None:
+        if not aid and not (data.get("name") or "").strip():
+            # 无 id 又无名称 = 不是一次有意的「新增」→ 拒绝，
+            # 免得像以前那样在 config.json 里留下一堆空连接。
+            raise ValueError("新增连接必须填写名称")
+        if aid and not re.match(r"^[A-Za-z0-9_\-]{1,40}$", aid):
+            raise ValueError("连接 id 非法")
+        if not aid:
+            aid = new_app_id()
+        app = {"id": aid}
+        apps.append(app)
+        created = True
+
+    if "name" in data:
+        app["name"] = str(data.get("name") or "").strip()[:60]
+    for src, dst in (("apiKey", "api_key"), ("baseUrl", "base_url"),
+                     ("appType", "app_type"), ("inputVar", "input_var")):
+        if src not in data:
+            continue
+        val = str(data.get(src) or "").strip()
+        if dst == "base_url" and val:
+            if not re.match(r"^https?://", val, re.I):
+                val = "http://" + val
+            val = val.rstrip("/")
+        if dst == "app_type":
+            val = val.lower()
+            if val not in ("chatflow", "workflow", ""):
+                val = ""
+        # 密钥留空 = 不修改；其余字段留空 = 回退到全局值
+        if dst == "api_key" and not val:
+            continue
+        app[dst] = val
+    if isinstance(data.get("extraInputs"), dict):
+        app["extra_inputs"] = data["extraInputs"]
+    elif isinstance(data.get("extraInputs"), str):
+        try:
+            parsed = json.loads(data["extraInputs"] or "{}")
+            if isinstance(parsed, dict):
+                app["extra_inputs"] = parsed
+        except Exception:
+            raise ValueError("extraInputs 不是合法 JSON")
+
+    app.setdefault("name", "")
+    if activate or not (d.get("active_app") or ""):
+        d["active_app"] = app["id"]
+    return app, created
+
+
+def delete_app(aid):
+    """删除一条连接；返回 (ok, err)。当前启用的连接不允许删除。"""
+    d = CONFIG.setdefault("dify", {})
+    apps = d.get("apps") or []
+    if not _app_id_exists(aid):
+        return False, "连接不存在"
+    if (d.get("active_app") or "") == aid:
+        return False, "这是当前正在用的连接，请先切换到其它连接再删除"
+    if len(apps) <= 1:
+        return False, "至少要保留一条连接"
+    d["apps"] = [a for a in apps if a.get("id") != aid]
+    return True, ""
+
+
+def effective_dify():
+    """当前生效的连接参数（连接值覆盖全局默认值）。所有出网请求都应走这里。"""
+    d = CONFIG.get("dify") or {}
+    out = {
+        "base_url": (d.get("base_url") or "").rstrip("/"),
+        "api_key": d.get("api_key") or "",
+        "app_type": d.get("app_type") or "chatflow",
+        "input_var": d.get("input_var") or "query",
+        "extra_inputs": dict(d.get("extra_inputs") or {}),
+        "dataset_api_key": d.get("dataset_api_key") or "",
+        "stream": bool(d.get("stream", True)),
+        "timeout": d.get("timeout", 900),
+        "active_app": d.get("active_app") or "",
+        "active_name": "",
+    }
+    app = get_app(None)
+    if app:
+        out["active_app"] = app.get("id") or ""
+        out["active_name"] = app.get("name") or ""
+        for k in ("base_url", "api_key", "app_type", "input_var"):
+            v = app.get(k)
+            if v:
+                out[k] = v.rstrip("/") if k == "base_url" else v
+        if app.get("extra_inputs"):
+            merged = dict(out["extra_inputs"])
+            merged.update(app["extra_inputs"])
+            out["extra_inputs"] = merged
+    return out
+
+
+def migrate_apps():
+    """启动时把「单套配置」平滑迁移成「一条连接」，并修正 active_app。"""
+    d = CONFIG.setdefault("dify", {})
+    apps = d.setdefault("apps", [])
+    changed = False
+    # 老配置：dify.api_key 是真密钥、apps 为空 → 迁移成一条连接
+    if not apps and _key_is_real(d.get("api_key"), "app-"):
+        apps.append({
+            "id": "default",
+            "name": "",
+            "api_key": d.get("api_key"),
+            "base_url": "",
+            "app_type": "",
+            "input_var": "",
+        })
+        d["active_app"] = "default"
+        changed = True
+        print("[cfg] 已把原有单套 Dify 配置迁移为 1 条「工作流连接」")
+    # 清掉占位符 / 空条目
+    cleaned = []
+    for a in apps:
+        if not isinstance(a, dict):
+            continue
+        a.setdefault("id", new_app_id())
+        if a.get("api_key") and not _key_is_real(a.get("api_key"), "app-"):
+            a["api_key"] = ""
+            changed = True
+        cleaned.append(a)
+    if len(cleaned) != len(apps):
+        d["apps"] = cleaned
+        changed = True
+    # active_app 必须指向存在的连接
+    if d.get("apps"):
+        if not _app_id_exists(d.get("active_app") or ""):
+            d["active_app"] = d["apps"][0]["id"]
+            changed = True
+    elif d.get("active_app"):
+        d["active_app"] = ""
+        changed = True
+    if changed:
+        save_config()
+    return changed
+
+
+# --------------------------------------------------------------------------
 # Dify Service API 通用调用（知识库管理用）
 # --------------------------------------------------------------------------
 class DifyApiError(Exception):
@@ -206,8 +447,9 @@ class DifyApiError(Exception):
 def dify_api(method, path, body=None, timeout=60, key_kind="dataset"):
     """调用 Dify Service API，返回 (status, obj)；网络异常时直接抛 DifyApiError。"""
     d = CONFIG.get("dify") or {}
-    base = (d.get("base_url") or "").rstrip("/")
-    key = d.get("dataset_api_key") if key_kind == "dataset" else d.get("api_key")
+    eff = effective_dify()
+    base = (eff.get("base_url") or "").rstrip("/")
+    key = d.get("dataset_api_key") if key_kind == "dataset" else eff.get("api_key")
     if not base or not key:
         raise DifyApiError(0, "服务端尚未配置 Dify 地址或知识库密钥")
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -626,6 +868,9 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/kb"):
                 return self.handle_kb("GET", path)
 
+            if path.startswith("/api/apps"):
+                return self.handle_apps("GET", path)
+
             if path == "/api/me":
                 user = self.require_user()
                 return None if not user else self.send_json({"ok": True, "user": user})
@@ -673,6 +918,9 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/kb"):
                 return self.handle_kb("POST", path)
 
+            if path.startswith("/api/apps"):
+                return self.handle_apps("POST", path)
+
             if path == "/api/register":
                 return self.handle_register()
             if path == "/api/login":
@@ -714,6 +962,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path.startswith("/api/kb"):
                 return self.handle_kb("DELETE", path)
+
+            if path.startswith("/api/apps/"):
+                return self.handle_apps("DELETE", path)
 
             m = re.match(r"^/api/conversations/([A-Za-z0-9_\-]+)$", path)
             if m:
@@ -1021,8 +1272,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.kb_docs(g[0])
             if name == "doc":
                 return self.kb_doc(g[0], g[1], method)
-            if name == "segs" and method == "GET":
-                return self.kb_segments(g[0], g[1])
+            if name == "segs":
+                if method not in ("GET", "POST"):
+                    return self.send_json({"ok": False, "error": "方法不支持：%s %s" % (method, path)}, 405)
+                return self.kb_segments(g[0], g[1], method)
             if name == "seg":
                 return self.kb_segment(g[0], g[1], g[2], method)
             return self.send_json({"ok": False, "error": "方法不支持：%s %s" % (method, path)}, 405)
@@ -1420,7 +1673,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True})
         return self.send_json({"ok": False, "error": "方法不支持"}, 405)
 
-    def kb_segments(self, ds_id, doc_id):
+    def kb_segments(self, ds_id, doc_id, method="GET"):
+        """GET 读分段列表；POST 新增分段（转发 Dify 的 Create Chunks）。"""
+        if method == "POST":
+            return self.kb_segment_create(ds_id, doc_id)
         q = self.qs()
         page = max(1, self.to_int(q.get("page"), 1))
         limit = min(100, max(1, self.to_int(q.get("limit"), 10)))
@@ -1436,6 +1692,79 @@ class Handler(BaseHTTPRequestHandler):
             "total": obj.get("total"),
             "hasMore": bool(obj.get("has_more")),
             "segments": [norm_segment(s) for s in (obj.get("data") or [])],
+        })
+
+    # Dify 只允许在「索引完成 + 启用中」的文档里新增分段，报错是英文的，这里翻成能看懂的中文。
+    # 键统一小写、按顺序匹配（先具体后笼统）。
+    SEG_CREATE_ERR = (
+        ("not completed", "这个文档还在建立索引（或索引出错）—— 等它变成「可用」之后再新增分段"),
+        ("is disabled", "这个文档已被禁用 —— 请先在文档列表里启用它，再新增分段"),
+        ("document not found", "文档不存在（可能已被删除），请返回文档列表刷新"),
+        ("dataset not found", "知识库不存在（可能已被删除），请刷新知识库列表"),
+        ("content is empty", "分段内容不能为空"),
+        ("embedding model", "该知识库没有可用的嵌入模型，请先在 Dify 里配置"),
+    )
+
+    MAX_SEG_BATCH = 50
+
+    @staticmethod
+    def parse_segments_body(data):
+        """把提交体解析成 Dify 要的 segments 数组。支持两种写法：
+
+          {"content": "...", "keywords": [...], "answer": "..."}   → 新增一条
+          {"segments": [{"content": "..."}, ...]}                  → 一次新增多条
+        """
+        raw = data.get("segments")
+        src = raw if isinstance(raw, list) else [data]
+        out = []
+        for it in src:
+            if not isinstance(it, dict):
+                continue
+            content = str(it.get("content") or "")
+            if not content.strip():
+                raise ValueError("分段内容不能为空")
+            seg = {"content": content}
+            ans = it.get("answer")
+            if ans is not None and str(ans).strip():
+                seg["answer"] = str(ans)
+            kws = it.get("keywords")
+            if isinstance(kws, list):
+                kw = [str(k).strip() for k in kws if str(k).strip()]
+            elif isinstance(kws, str):
+                kw = [k for k in re.split(r"[,，\s]+", kws) if k]
+            else:
+                kw = []
+            if kw:
+                seg["keywords"] = kw
+            out.append(seg)
+        return out
+
+    def kb_segment_create(self, ds_id, doc_id):
+        try:
+            items = self.parse_segments_body(self.read_json())
+        except ValueError as e:
+            return self.send_json({"ok": False, "error": str(e)}, 400)
+        if not items:
+            return self.send_json({"ok": False, "error": "没有要新增的分段"}, 400)
+        if len(items) > self.MAX_SEG_BATCH:
+            return self.send_json(
+                {"ok": False, "error": "一次最多新增 %d 条分段（本次 %d 条）" % (self.MAX_SEG_BATCH, len(items))}, 400)
+        try:
+            obj = dify_ok("POST", "/datasets/%s/documents/%s/segments" % (ds_id, doc_id),
+                          {"segments": items}, timeout=240)
+        except DifyApiError as e:
+            msg = e.message or ""
+            for needle, zh in self.SEG_CREATE_ERR:
+                if needle in msg.lower():
+                    raise DifyApiError(e.status, zh)
+            raise
+        segs = [norm_segment(s) for s in (obj.get("data") or [])]
+        print("[kb] 新增分段 %d 条 -> %s / %s" % (len(segs), ds_id[:8], doc_id[:8]))
+        return self.send_json({
+            "ok": True,
+            "created": len(segs),
+            "docForm": obj.get("doc_form") or "",
+            "segments": segs,
         })
 
     def kb_segment(self, ds_id, doc_id, seg_id, method):
@@ -1489,82 +1818,148 @@ class Handler(BaseHTTPRequestHandler):
             return {"error": "无法连接：%s" % e}
 
     def handle_health(self):
-        d = CONFIG.get("dify") or {}
+        d = effective_dify()
         if not dify_ready():
             return self.send_json({
                 "ok": False, "configured": False,
                 "error": "服务端尚未配置 Dify 地址或密钥，请在「接口设置」中填写",
                 "baseUrl": d.get("base_url") or "", "appType": d.get("app_type") or "",
+                "activeApp": d.get("active_app") or "", "name": d.get("active_name") or "",
             })
         info = self.probe_dify(d.get("base_url"), d.get("api_key"))
         ok = "error" not in info
         self.send_json({
             "ok": ok,
             "configured": True,
-            "name": info.get("name", ""),
+            "name": info.get("name", "") or d.get("active_name") or "",
             "mode": info.get("mode", ""),
             "error": info.get("error", ""),
             "baseUrl": d.get("base_url"),
             "appType": d.get("app_type"),
+            "activeApp": d.get("active_app") or "",
         })
 
+    def app_public(self, app, active):
+        """把一条连接转成可下发到浏览器的结构（密钥掩码）。"""
+        real = _key_is_real(app.get("api_key"), "app-")
+        return {
+            "id": app.get("id") or "",
+            "name": app.get("name") or "",
+            "apiKeyMasked": mask_key(app.get("api_key")) if real else "",
+            "hasKey": real,
+            "baseUrl": app.get("base_url") or "",
+            "appType": app.get("app_type") or "",
+            "inputVar": app.get("input_var") or "",
+            "extraInputs": app.get("extra_inputs") or {},
+            "active": bool(active) and app.get("id") == active,
+        }
+
     def handle_get_settings(self):
+        self.autoname_apps()
         d = CONFIG.get("dify") or {}
+        eff = effective_dify()
         # 只在密钥"确实像真的"时才回显掩码；占位符一律显示为空 → 页面显示「未设置」
         app_ok = dify_ready()
         ds_ok = dataset_ready()
+        active = d.get("active_app") or ""
         self.send_json({
             "ok": True,
-            "baseUrl": d.get("base_url") or "",
-            "appType": d.get("app_type") or "chatflow",
-            "inputVar": d.get("input_var") or "query",
-            "extraInputs": d.get("extra_inputs") or {},
+            "baseUrl": eff.get("base_url") or "",
+            "appType": eff.get("app_type") or "chatflow",
+            "inputVar": eff.get("input_var") or "query",
+            "extraInputs": eff.get("extra_inputs") or {},
             "stream": bool(d.get("stream", True)),
             "timeout": d.get("timeout", 300),
-            "apiKeyMasked": mask_key(d.get("api_key")) if app_ok else "",
+            "apiKeyMasked": mask_key(eff.get("api_key")) if app_ok else "",
             "hasKey": app_ok,
             "datasetIdMasked": mask_key(d.get("dataset_api_key")) if ds_ok else "",
             "hasDatasetKey": ds_ok,
+            # ---- 多套工作流连接 ----
+            "activeApp": active,
+            "activeName": eff.get("active_name") or "",
+            "apps": [self.app_public(a, active) for a in list_apps()],
+            "globalBaseUrl": d.get("base_url") or "",
             "hint": "本页所有 Dify 请求都由本机服务端转发，密钥不会下发到浏览器。",
         })
 
     def handle_save_settings(self):
+        """保存设置。
+
+        约定：
+          - apps / activeApp 相关由 /api/apps 处理；这里只写「全局项」+ 当前连接的展示字段。
+          - 若同时传了 baseUrl/apiKey/appType/inputVar，会写进**当前启用的连接**（等价于编辑它）。
+        """
         data = self.read_json()
         d = CONFIG.setdefault("dify", {})
 
-        base = (data.get("baseUrl") or "").strip()
-        if base:
-            if not re.match(r"^https?://", base, re.I):
-                base = "http://" + base
-            d["base_url"] = base.rstrip("/")
+        # 切换当前连接（可选）
+        want_active = (data.get("activeApp") or "").strip()
+        if want_active and want_active != (d.get("active_app") or ""):
+            if not set_active_app(want_active):
+                return self.send_json({"ok": False, "error": "要切换的连接不存在"}, 400)
 
+        # 当前连接要落盘的字段（走 apps）
+        base = (data.get("baseUrl") or "").strip()
         key = (data.get("apiKey") or "").strip()
-        if key:
-            d["api_key"] = key
+        app_type = (data.get("appType") or "").strip().lower()
+        iv = (data.get("inputVar") or "").strip()
+        act = get_app(None)
+        if act and (base or key or app_type or iv or "extraInputs" in data):
+            # ★ 必须带上当前连接的 id：upsert_app 靠 id 判断「更新哪一条」，
+            #   不带 id 会被当成「新增」，每保存一次接口设置就凭空多出一条空连接。
+            patch = {"id": act.get("id")}
+            if base:
+                patch["baseUrl"] = base
+                d["base_url"] = re.sub(r"/+$", "", base if re.match(r"^https?://", base, re.I) else "http://" + base)
+            if key:
+                patch["apiKey"] = key
+            if app_type in ("chatflow", "workflow"):
+                patch["appType"] = app_type
+            if iv:
+                patch["inputVar"] = iv
+            if "extraInputs" in data:
+                ei = data.get("extraInputs")
+                if isinstance(ei, dict):
+                    patch["extraInputs"] = ei
+                elif isinstance(ei, str):
+                    try:
+                        parsed = json.loads(ei or "{}")
+                    except Exception:
+                        return self.send_json({"ok": False, "error": "extraInputs 不是合法 JSON"}, 400)
+                    if not isinstance(parsed, dict):
+                        return self.send_json({"ok": False, "error": "extraInputs 不是合法 JSON"}, 400)
+                    patch["extraInputs"] = parsed
+            try:
+                upsert_app(patch)
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+        else:
+            # 没有任何连接（老配置 / 首次启动）时，退回老行为：直接写全局
+            if base:
+                if not re.match(r"^https?://", base, re.I):
+                    base = "http://" + base
+                d["base_url"] = base.rstrip("/")
+            if key:
+                d["api_key"] = key
+            if app_type in ("chatflow", "workflow"):
+                d["app_type"] = app_type
+            if iv:
+                d["input_var"] = iv
+            if "extraInputs" in data:
+                ei = data.get("extraInputs")
+                if isinstance(ei, dict):
+                    d["extra_inputs"] = ei
+                elif isinstance(ei, str):
+                    try:
+                        parsed = json.loads(ei or "{}")
+                        if isinstance(parsed, dict):
+                            d["extra_inputs"] = parsed
+                    except Exception:
+                        return self.send_json({"ok": False, "error": "extraInputs 不是合法 JSON"}, 400)
 
         ds_key = (data.get("datasetApiKey") or "").strip()
         if ds_key:
             d["dataset_api_key"] = ds_key
-
-        app_type = (data.get("appType") or "").strip().lower()
-        if app_type in ("chatflow", "workflow"):
-            d["app_type"] = app_type
-
-        iv = (data.get("inputVar") or "").strip()
-        if iv:
-            d["input_var"] = iv
-
-        if "extraInputs" in data:
-            ei = data.get("extraInputs")
-            if isinstance(ei, dict):
-                d["extra_inputs"] = ei
-            elif isinstance(ei, str):
-                try:
-                    parsed = json.loads(ei or "{}")
-                    if isinstance(parsed, dict):
-                        d["extra_inputs"] = parsed
-                except Exception:
-                    return self.send_json({"ok": False, "error": "extraInputs 不是合法 JSON"}, 400)
 
         if "stream" in data:
             d["stream"] = bool(data["stream"])
@@ -1575,15 +1970,145 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
         save_config()
-        info = self.probe_dify(d.get("base_url"), d.get("api_key"))
+        eff = effective_dify()
+        info = self.probe_dify(eff.get("base_url"), eff.get("api_key"))
         self.send_json({
             "ok": True,
             "saved": True,
             "healthy": "error" not in info,
-            "name": info.get("name", ""),
+            "name": info.get("name", "") or eff.get("active_name") or "",
             "message": info.get("error", ""),
-            "apiKeyMasked": mask_key(d.get("api_key")),
+            "apiKeyMasked": mask_key(eff.get("api_key")),
+            "activeApp": eff.get("active_app") or "",
+            "activeName": eff.get("active_name") or "",
         })
+
+    # ---------------- 多套「工作流连接」管理 ----------------
+    def autoname_apps(self, limit=5):
+        """给「还没起名」的连接用 Dify /info 的应用名补上名字（只补空名，最多 limit 条）。
+
+        这样从老配置迁移过来的连接、以及只填了 App Key 的新连接，
+        第一次打开「接口设置」时就能直接看到「问答5.0」这种名字，不用手填。
+        """
+        d = CONFIG.get("dify") or {}
+        targets = [a for a in list_apps() if not (a.get("name") or "").strip()][:limit]
+        if not targets:
+            return False
+        global_base = (d.get("base_url") or "").rstrip("/")
+        changed = False
+        for a in targets:
+            base = (a.get("base_url") or global_base).rstrip("/")
+            key = a.get("api_key") or ""
+            if not base or not _key_is_real(key, "app-"):
+                continue
+            info = self.probe_dify(base, key, timeout=5)
+            name = (info.get("name") or "").strip()
+            if name:
+                a["name"] = name[:60]
+                changed = True
+            mode = (info.get("mode") or "").strip().lower()
+            if not a.get("app_type") and mode:
+                a["app_type"] = "workflow" if mode == "workflow" else "chatflow"
+                changed = True
+        if changed:
+            save_config()
+            print("[apps] 已按 Dify 应用信息自动补全连接名称")
+        return changed
+
+    def handle_apps(self, method, path):
+        """GET  /api/apps              列表（含当前启用）
+           POST /api/apps              新增/更新一条（可带 activate=true 同时切换）
+           POST /api/apps/active       切换当前连接
+           POST /api/apps/probe        测试连通（不落盘）
+           DELETE /api/apps/{id}       删除（当前启用的不可删）
+        """
+        user = self.require_user()
+        if not user:
+            return
+        active = (CONFIG.get("dify") or {}).get("active_app") or ""
+
+        if method == "GET":
+            self.autoname_apps()
+            active = (CONFIG.get("dify") or {}).get("active_app") or ""
+            return self.send_json({
+                "ok": True,
+                "activeApp": active,
+                "activeName": (effective_dify().get("active_name") or ""),
+                "apps": [self.app_public(a, active) for a in list_apps()],
+            })
+
+        if method == "POST" and path == "/api/apps/probe":
+            data = self.read_json()
+            aid = (data.get("id") or "").strip()
+            app = get_app(aid) if aid else None
+            base = (data.get("baseUrl") or "").strip() or (app or {}).get("base_url") or \
+                ((CONFIG.get("dify") or {}).get("base_url") or "")
+            if base and not re.match(r"^https?://", base, re.I):
+                base = "http://" + base
+            key = (data.get("apiKey") or "").strip() or (app or {}).get("api_key") or ""
+            if not key or not _key_is_real(key, "app-"):
+                # 没给新密钥 → 用当前启用连接的密钥试（用于"只改了地址"的场景）
+                eff = effective_dify()
+                key = eff.get("api_key") or ""
+                base = base or eff.get("base_url") or ""
+            if not base or not key:
+                return self.send_json({"ok": False, "error": "请先填写 API 访问点与 App Key"}, 400)
+            info = self.probe_dify(base, key)
+            if "error" in info:
+                return self.send_json({"ok": False, "error": info["error"], "baseUrl": base}, 502)
+            return self.send_json({
+                "ok": True, "name": info.get("name", ""), "mode": info.get("mode", ""),
+                "baseUrl": base, "apiKeyMasked": mask_key(key),
+            })
+
+        if method == "POST" and path == "/api/apps/active":
+            data = self.read_json()
+            aid = (data.get("id") or "").strip()
+            if not set_active_app(aid):
+                return self.send_json({"ok": False, "error": "连接不存在"}, 404)
+            save_config()
+            eff = effective_dify()
+            print("[apps] 已切换工作流 -> %s (%s)" % (eff.get("active_name") or aid, aid))
+            return self.send_json({
+                "ok": True, "activeApp": aid, "activeName": eff.get("active_name") or "",
+                "apps": [self.app_public(a, aid) for a in list_apps()],
+            })
+
+        if method == "POST" and path == "/api/apps":
+            data = self.read_json()
+            name = (data.get("name") or "").strip()
+            if not name:
+                return self.send_json({"ok": False, "error": "请填写连接名称"}, 400)
+            key = (data.get("apiKey") or "").strip()
+            if key and not key.startswith("app-"):
+                return self.send_json({"ok": False, "error": "App Key 应以 app- 开头"}, 400)
+            try:
+                app, created = upsert_app(data, activate=bool(data.get("activate", True)))
+            except ValueError as e:
+                return self.send_json({"ok": False, "error": str(e)}, 400)
+            save_config()
+            active = (CONFIG.get("dify") or {}).get("active_app") or ""
+            print("[apps] %s连接：%s (%s)" % ("新增" if created else "更新", app.get("name"), app.get("id")))
+            return self.send_json({
+                "ok": True, "created": created, "id": app.get("id"),
+                "activeApp": active,
+                "apps": [self.app_public(a, active) for a in list_apps()],
+            })
+
+        if method == "DELETE":
+            aid = path[len("/api/apps/"):].strip("/")
+            ok, err = delete_app(aid)
+            if not ok:
+                return self.send_json({"ok": False, "error": err}, 409)
+            save_config()
+            active = (CONFIG.get("dify") or {}).get("active_app") or ""
+            print("[apps] 已删除连接：%s" % aid)
+            return self.send_json({
+                "ok": True, "activeApp": active,
+                "apps": [self.app_public(a, active) for a in list_apps()],
+            })
+
+        return self.send_json({"ok": False, "error": "方法不支持：%s %s" % (method, path)}, 405)
 
     # ---------------- 知识文件上传（转发 Dify /files/upload） ----------------
     def parse_multipart(self):
@@ -1661,7 +2186,7 @@ class Handler(BaseHTTPRequestHandler):
         if len(content) > MAX_UPLOAD_BYTES:
             return self.send_json({"ok": False, "error": "文件超过 %dMB 限制" % (MAX_UPLOAD_BYTES // 1024 // 1024)}, 413)
 
-        d = CONFIG["dify"]
+        d = effective_dify()   # 走「当前启用」的那条工作流连接
         url = (d.get("base_url") or "").rstrip("/") + "/files/upload"
         boundary = "----MedQA50" + secrets.token_hex(12)
         buf = bytearray()
@@ -1762,7 +2287,7 @@ class Handler(BaseHTTPRequestHandler):
                 {"ok": False, "error": "服务端尚未配置 Dify 地址或密钥，请在「接口设置」中填写"}, 500
             )
 
-        d = CONFIG["dify"]
+        d = effective_dify()   # 走「当前启用」的那条工作流连接
         app_type = (d.get("app_type") or "chatflow").lower()
         base = (d.get("base_url") or "").rstrip("/")
         api_key = d.get("api_key") or ""
@@ -1882,7 +2407,7 @@ class Handler(BaseHTTPRequestHandler):
             },
             method="POST",
         )
-        timeout = float((CONFIG.get("dify") or {}).get("timeout", 300))
+        timeout = float(effective_dify().get("timeout", 300))
 
         try:
             resp = urllib.request.urlopen(req, timeout=timeout)
@@ -2075,6 +2600,12 @@ def main():
     # 允许用环境变量临时覆盖端口 / 数据库（供自检脚本用，不污染真实数据）
     port = int(os.environ.get("MQ50_PORT") or (CONFIG.get("server") or {}).get("port", 8001))
 
+    # 老版本的单套配置 → 升级成「一条连接」（幂等）
+    try:
+        migrate_apps()
+    except Exception:
+        traceback.print_exc()
+
     # 先查端口，再打印横幅 —— 否则用户会先看到一堆"启动信息"、最后才发现失败
     if port_in_use(host, port):
         print("")
@@ -2087,7 +2618,7 @@ def main():
         return 1
 
     init_db()
-    d = CONFIG.get("dify") or {}
+    d = effective_dify()
     ip = get_local_ip()
 
     def _show(real, key):
@@ -2099,6 +2630,9 @@ def main():
     print("  本机访问  : http://127.0.0.1:%d" % port)
     print("  局域网访问: http://%s:%d   <- 手机/其它电脑用这个" % (ip, port))
     print("-" * 62)
+    print("  当前工作流: %s" % (d.get("active_name") or d.get("active_app") or "（未命名连接）"))
+    print("              %s  [共 %d 条连接，可在「接口设置」里切换]"
+          % (mask_key(d.get("api_key")) if dify_ready() else "未配置密钥", len(list_apps())))
     print("  Dify 地址 : %s" % (d.get("base_url") or "未配置"))
     print("  应用类型  : %s" % (d.get("app_type") or "chatflow"))
     print("  流式输出  : %s" % ("开" if d.get("stream", True) else "关"))
