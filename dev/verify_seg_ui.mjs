@@ -162,6 +162,22 @@ chk(doc.querySelectorAll('.kb-modal-mask').length === nModal, '文档禁用时�
 chk(/禁用/.test($('toast').textContent), '并给出原因：' + $('toast').textContent);
 chk(!!doc.querySelector('.kb-warn'), '列表顶部出现黄色提示条');
 
+/* ---------- 分段正文字号（阅读舒适度） ---------- */
+const css = fs.readFileSync('static/style.css', 'utf8');
+const sizeOf = (sel) => {
+  const m = css.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{[^}]*font-size:([^;}]+)'));
+  return m ? m[1].trim() : null;
+};
+const cardFs = sizeOf('.kbs-content');
+const taFs = sizeOf('.kbm-fg textarea.mono');
+chk(cardFs === '14px', '分段卡片正文字号 = 14px（原来 12.5px 偏小）：' + cardFs);
+chk(taFs === '14px', '分段「编辑/新增」弹窗的等宽输入框同号 14px：' + taFs);
+chk(cardFs === taFs, '卡片与弹窗字号一致（同一段内容两处看起来一样大）');
+chk(!/\.kbs-content\{[^}]*font-size:12\.5px/.test(css), 'CSS 里已无 12.5px 的分段正文（不会被旧值覆盖）');
+chk(/\.kbs-content\{[^}]*line-height:1\.72/.test(css), '放大字号后仍保留 1.72 宽松行距');
+const clamp = css.match(/\.kbs-content\.clamp\{max-height:(\d+)px/);
+chk(clamp && +clamp[1] >= 148, '折叠高度同步放大到 ' + (clamp ? clamp[1] + 'px' : '缺失') + '（否则字号大了反而少看两行）');
+
 console.log('---');
 console.log('通过 ' + pass + ' 项，失败 ' + fails.length + ' 项');
 if (fails.length) { fails.forEach((f) => console.log('  \u2717 ' + f)); process.exit(1); }

@@ -614,10 +614,12 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
 .kbs-kw{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 0}
 .kbs-chip{font-size:11px;color:var(--brand-ink);background:var(--brand-soft);border:1px solid var(--brand-2);
   border-radius:20px;padding:2px 9px}
-.kbs-content{font-family:var(--mono);font-size:12.5px;line-height:1.72;white-space:pre-wrap;word-break:break-word;
+/* 分段正文：这是要人逐条读、核对的内容，字号给到 14px（原先 12.5px 偏小，与弹窗里的
+   等宽输入框同步），行高保持 1.72 的宽松行距，长分段照样折叠 */
+.kbs-content{font-family:var(--mono);font-size:14px;line-height:1.72;white-space:pre-wrap;word-break:break-word;
   padding:12px 14px;margin:0;max-height:280px;overflow:auto;color:var(--text);background:transparent}
 /* 长分段先折叠，避免一屏只看得到一条 */
-.kbs-content.clamp{max-height:134px;overflow:hidden;
+.kbs-content.clamp{max-height:150px;overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,#000 58%,transparent);
   mask-image:linear-gradient(180deg,#000 58%,transparent)}
 .kbs-more{display:block;width:100%;text-align:center;font-size:var(--fs-xs);font-weight:600;color:var(--brand);
@@ -653,7 +655,7 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
   transition:border-color .15s}
 .kbm-fg input:focus,.kbm-fg textarea:focus{border-color:var(--brand-2);background:var(--panel)}
 .kbm-fg textarea{resize:vertical;line-height:1.7}
-.kbm-fg textarea.mono{font-family:var(--mono);font-size:12.5px}
+.kbm-fg textarea.mono{font-family:var(--mono);font-size:14px}
 .kbm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .kbm-chk{display:flex;align-items:center;gap:9px;font-size:13.5px;margin-bottom:10px;cursor:pointer}
 .kbm-chk input{width:16px;height:16px;accent-color:var(--brand)}
@@ -673,7 +675,7 @@ html[data-theme="dark"] .toast{background:#e6f2f7;color:#0b1418}
   .kb-row{flex-wrap:wrap}
   .kb-row:hover{transform:none}
   .kbs-content{max-height:200px}
-  .kbs-content.clamp{max-height:110px}
+  .kbs-content.clamp{max-height:124px}
   .kbm-grid{grid-template-columns:1fr}
   .kb-toolbar{gap:7px}
   .kb-search{min-width:130px}
