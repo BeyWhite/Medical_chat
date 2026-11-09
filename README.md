@@ -49,6 +49,22 @@
 
 ![知识库入库链路](assets/diagrams/ingestion.svg)
 
+#### 界面预览
+
+> 以下为系统实际运行界面截图（登录页、问答主界面、知识库文档管理）。
+
+**① 登录 / 注册页**
+
+<img src="assets/screenshots/01-login.jpg" alt="登录注册页" width="860">
+
+**② 问答主界面：提问、流式作答与知识来源**
+
+<img src="assets/screenshots/02-chat.png" alt="问答主界面" width="860">
+
+**③ 知识库文档管理：分段、禁用、归档、删除**
+
+<img src="assets/screenshots/03-knowledge-base.png" alt="知识库文档管理" width="860">
+
 ### 1.1 与其他项目的关系
 
 本机存在两份功能相近的项目，请注意区分：
@@ -82,6 +98,9 @@ medical-qa-50/
 ├── data/                     运行数据（自动生成）
 │   ├── app.db                SQLite：用户、会话、消息、统计
 │   └── server.pid            进程号（供 stop 脚本定位）
+├── assets/                   文档配图
+│   ├── diagrams/             架构与流程图（SVG）
+│   └── screenshots/          界面截图（登录、问答、知识库）
 ├── dev/                      开发与诊断脚本（不参与运行）
 ├── tools/package.py          打包脚本
 ├── verify.sh                 端到端验收脚本
