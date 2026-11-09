@@ -1,0 +1,239 @@
+{
+ "nodes": [
+  {
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "zIndex": 0,
+   "id": "1788759963315",
+   "positionAbsolute": {
+    "x": 80,
+    "y": 282
+   },
+   "data": {
+    "desc": "",
+    "type": "start",
+    "title": "开始",
+    "variables": [],
+    "selected": false
+   },
+   "position": {
+    "y": 282,
+    "x": 80
+   },
+   "type": "custom",
+   "height": 72,
+   "selected": false,
+   "width": 242
+  },
+  {
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "zIndex": 0,
+   "id": "1788759983275",
+   "positionAbsolute": {
+    "x": 380,
+    "y": 282
+   },
+   "data": {
+    "desc": "",
+    "query_attachment_selector": [],
+    "query_variable_selector": [
+     "1788759963315",
+     "sys.query"
+    ],
+    "retrieval_mode": "multiple",
+    "title": "知识检索",
+    "type": "knowledge-retrieval",
+    "multiple_retrieval_config": {
+     "top_k": 3,
+     "reranking_enable": true,
+     "reranking_model": {
+      "provider": "langgenius/siliconflow/siliconflow",
+      "model": "BAAI/bge-reranker-v2-m3"
+     },
+     "weights": {
+      "keyword_setting": {
+       "keyword_weight": 0
+      },
+      "weight_type": "customized",
+      "vector_setting": {
+       "embedding_provider_name": "langgenius/siliconflow/siliconflow",
+       "vector_weight": 1,
+       "embedding_model_name": "Pro/BAAI/bge-m3"
+      }
+     },
+     "score_threshold": 0.5,
+     "reranking_mode": "reranking_model"
+    },
+    "dataset_ids": [
+     "4657f032-fd37-4763-9208-1f8d907d244d",
+     "1850109b-6d81-4f7f-9138-28be896ba0b9",
+     "079a4b2b-6cac-43fa-b415-3363be7cef2b",
+     "55f0131b-7c4c-43ab-a9f9-d7884fe4dea0",
+     "5e2f6f97-17f9-400b-880a-a64774710f37",
+     "667de273-df3e-4f96-bf8b-ad68e5b32796",
+     "1098ee63-0ce6-41ea-b55f-cf7596573140",
+     "15d8084e-5807-40ae-b942-adbcb7721cf8",
+     "b98955c3-0637-433c-b0d1-8a80749f603b"
+    ],
+    "selected": false
+   },
+   "position": {
+    "y": 282,
+    "x": 380
+   },
+   "type": "custom",
+   "height": 51,
+   "selected": false,
+   "width": 241
+  },
+  {
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "zIndex": 0,
+   "id": "answer",
+   "positionAbsolute": {
+    "x": 980,
+    "y": 282
+   },
+   "data": {
+    "answer": "{{#llm.text#}}",
+    "desc": "",
+    "title": "直接回复",
+    "type": "answer",
+    "variables": [],
+    "selected": false
+   },
+   "position": {
+    "y": 282,
+    "x": 980
+   },
+   "type": "custom",
+   "height": 101,
+   "selected": false,
+   "width": 241
+  },
+  {
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "zIndex": 0,
+   "id": "llm",
+   "positionAbsolute": {
+    "x": 689.1553154548594,
+    "y": 282
+   },
+   "data": {
+    "variables": [],
+    "prompt_template": [
+     {
+      "id": "d64e5603-0eff-4f10-bff8-fae65c054ada",
+      "role": "system",
+      "text": "针对问题{{#sys.query#}}和知识库返回的内容{{#context#}}，进行润色，只返回问题相关的内容，只要总结结果"
+     },
+     {
+      "id": "80f4d397-5a1a-4fb4-8949-ba1a0e2b7577",
+      "role": "user",
+      "text": ""
+     }
+    ],
+    "desc": "",
+    "context": {
+     "enabled": true,
+     "variable_selector": [
+      "1788759983275",
+      "result"
+     ]
+    },
+    "title": "LLM",
+    "type": "llm",
+    "memory": {
+     "query_prompt_template": "{{#sys.query#}}",
+     "role_prefix": {
+      "assistant": "",
+      "user": ""
+     },
+     "window": {
+      "size": 10,
+      "enabled": false
+     }
+    },
+    "vision": {
+     "enabled": false
+    },
+    "model": {
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "provider": "langgenius/siliconflow/siliconflow",
+     "completion_params": {},
+     "mode": "chat"
+    },
+    "selected": false
+   },
+   "position": {
+    "y": 282,
+    "x": 689.1553154548594
+   },
+   "type": "custom",
+   "height": 87,
+   "selected": true,
+   "width": 241
+  }
+ ],
+ "edges": [
+  {
+   "zIndex": 0,
+   "sourceHandle": "source",
+   "id": "1788759963315-source-1788759983275-target",
+   "target": "1788759983275",
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "start",
+    "targetType": "knowledge-retrieval",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "targetHandle": "target",
+   "source": "1788759963315",
+   "type": "custom"
+  },
+  {
+   "zIndex": 0,
+   "sourceHandle": "source",
+   "id": "1788759983275-source-llm-target",
+   "target": "llm",
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "knowledge-retrieval",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "targetHandle": "target",
+   "source": "1788759983275",
+   "type": "custom"
+  },
+  {
+   "zIndex": 0,
+   "sourceHandle": "source",
+   "id": "llm-answer",
+   "target": "answer",
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "targetHandle": "target",
+   "source": "llm",
+   "type": "custom"
+  }
+ ],
+ "viewport": {
+  "x": 25.440015490319126,
+  "y": 29.467967956777386,
+  "zoom": 0.8777737605248689
+ }
+}

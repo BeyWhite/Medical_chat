@@ -15,3 +15,13 @@ _sample.txt
 _o.txt
 _r.txt
 _t.py
+
+# 备份与密钥快照（绝不入库）
+*.bak
+# dify-workflow 本地快照目录
+dify-workflow/backup/
+# 开发测试产物与调试快照（JSON 数据、调试记录、live 快照，非脚本）
+dev/**/*.json
+dev/**/*.md
+dev/wf50/
+dev/wf70/

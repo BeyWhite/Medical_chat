@@ -1,14 +1,16 @@
 /* =========================================================================
-   知识库管理（问答5.0 前端）
+   知识库管理（前端）
    三层导航：知识库列表 → 文档列表 → 分段列表
    能力：编辑（名称/描述/检索参数）、删除、禁用/启用、文档与分段的增删改
    接口：全部走本机后端 /api/kb*，由后端转发 Dify Service API（知识库密钥不下发浏览器）
 
    ⚠️ 按钮配色规范（本抽屉内只有三色，别再引入第四种）：
      ① 主操作  = `btn pri sm`      品牌蓝实心：进下一层（文档管理 / 分段）、新增分段
-     ② 次要操作 = `btn gho sm`      灰色描边：编辑、启用/禁用、归档、搜索、清空、翻页、取消
+     ② 次要操作 = `btn gho sm`      灰色描边：编辑、启用/禁用、归档、搜索、清空、翻页、跳转、取消
      ③ 破坏性  = `btn gho sm dgr-txt` 橙色：删除（弹窗里的确认按钮用 `btn dgr` 实心橙）
    不要再用 `pri-txt`（青色描边）：它只是"接口设置"里给新增连接留的样式。
+   ⚠️ 页码按钮（1 2 3 …）用专属类 `.kb-pg`，不是 `.btn` —— 这样上面「只有三色」的约束依然成立；
+      它自带 `.on` 高亮态，别用 `btn pri/gho` 去套页码。
    详见 README「按钮配色」一节与 dev/verify_btn_ui.mjs。
    ========================================================================= */
 (function () {
@@ -234,6 +236,13 @@
       }
     });
     $('kbFoot').addEventListener('click', onFootClick);
+    $('kbFoot').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target && e.target.id === 'kbPgJump') {
+        e.preventDefault();
+        var v = String(e.target.value || '').trim();
+        if (v) goPage(v);
+      }
+    });
     st.built = true;
   }
 
@@ -316,17 +325,69 @@
     }
   }
 
+  /* 页码列表：页数 ≤ 7 全列；否则只列「首页 + 当前页前后各 2 页 + 末页」，
+     中间断开处用 '…' 占位。返回 [1, '…', 4, 5, 6, '…', 20] 这样的数组。 */
+  function pageList(cur, pages) {
+    var i, out = [];
+    if (pages <= 7) {
+      for (i = 1; i <= pages; i++) out.push(i);
+      return out;
+    }
+    out.push(1);
+    var s = Math.max(2, cur - 2), e = Math.min(pages - 1, cur + 2);
+    if (s > 2) out.push('…');
+    for (i = s; i <= e; i++) out.push(i);
+    if (e < pages - 1) out.push('…');
+    out.push(pages);
+    return out;
+  }
+
+  /* 分页器：上一页 + 页码 + 下一页 + 「跳至第 N 页」
+     页码用 `.kb-pg`（非 .btn，自带 .on 高亮），翻页/跳转按钮才用 `btn gho sm`，守住三色规范。 */
   function pagerHtml(pg) {
-    var pages = Math.max(1, Math.ceil((pg.total || 0) / pg.limit));
     if (!pg.total) return '';
+    var pages = Math.max(1, Math.ceil(pg.total / pg.limit));
+    var chips = pageList(pg.page, pages).map(function (n) {
+      if (n === '…') return '<span class="kb-pg dots">…</span>';
+      var on = n === pg.page;
+      return '<button class="kb-pg' + (on ? ' on' : '') + '" data-pgto="' + n + '"' +
+        (on ? ' aria-current="page"' : '') + ' title="第 ' + n + ' 页">' + n + '</button>';
+    }).join('');
     return '<span class="kb-pageinfo">第 ' + pg.page + ' / ' + pages + ' 页 · 共 ' + pg.total + ' 项</span>' +
       '<div class="kb-pager">' +
         '<button class="btn gho sm" data-pg="prev"' + (pg.page <= 1 ? ' disabled' : '') + '>上一页</button>' +
+        '<span class="kb-pgs">' + chips + '</span>' +
         '<button class="btn gho sm" data-pg="next"' + (pg.page >= pages ? ' disabled' : '') + '>下一页</button>' +
+        '<label class="kb-jump" title="输入页码后回车，或点右侧「跳转」">跳至' +
+          '<input id="kbPgJump" type="number" min="1" max="' + pages + '" inputmode="numeric" ' +
+            'placeholder="' + pg.page + '" aria-label="跳转到第几页">页</label>' +
+        '<button class="btn gho sm" data-pg="go">跳转</button>' +
       '</div>';
   }
 
   function setCount(txt) { var el = $('kbCount'); if (el) el.textContent = txt || ''; }
+
+  /* ---------------- 翻页（上一页 / 下一页 / 页码 / 跳转 共用） ---------------- */
+  function curPager() {
+    return st.view === 'ds' ? st.ds : (st.view === 'docs' ? st.docs : st.segs);
+  }
+  function reloadView() {
+    if (st.view === 'ds') loadDs();
+    else if (st.view === 'docs') loadDocs();
+    else loadSegs();
+  }
+  /* 跳到第 n 页：越界自动夹到 [1, 总页数]；和目标页相同则不发请求 */
+  function goPage(n) {
+    var pg = curPager();
+    var pages = Math.max(1, Math.ceil((pg.total || 0) / pg.limit));
+    n = parseInt(n, 10);
+    if (isNaN(n)) return;
+    if (n < 1) n = 1;
+    if (n > pages) n = pages;
+    if (n === pg.page) return;
+    pg.page = n;
+    reloadView();
+  }
 
   function loading(text) {
     $('kbBody').innerHTML =
@@ -833,12 +894,21 @@
   }
 
   function onFootClick(e) {
+    // ① 点页码数字直接跳页
+    var to = e.target.closest ? e.target.closest('[data-pgto]') : null;
+    if (to) { goPage(to.getAttribute('data-pgto')); return; }
+    // ② 上一页 / 下一页 / 跳转
     var b = e.target.closest ? e.target.closest('[data-pg]') : null;
     if (!b || b.disabled) return;
     var dir = b.getAttribute('data-pg');
-    if (st.view === 'ds') { st.ds.page = Math.max(1, st.ds.page + (dir === 'next' ? 1 : -1)); loadDs(); }
-    else if (st.view === 'docs') { st.docs.page = Math.max(1, st.docs.page + (dir === 'next' ? 1 : -1)); loadDocs(); }
-    else { st.segs.page = Math.max(1, st.segs.page + (dir === 'next' ? 1 : -1)); loadSegs(); }
+    if (dir === 'go') {
+      var inp = $('kbPgJump');
+      var raw = inp ? String(inp.value || '').trim() : '';
+      if (!raw) { if (inp) inp.focus(); return; }   // 空输入不跳，避免莫名回到第 1 页
+      goPage(raw);
+      return;
+    }
+    goPage(curPager().page + (dir === 'next' ? 1 : -1));
   }
 
   /* ---------------- 进入下层 ---------------- */
@@ -1085,6 +1155,7 @@
     loadRetrieval: loadRetrieval, archDialog: archDialog, isRetrieval: isRetrieval,
     setRetrieval: setRetrieval, busyModal: busyModal,
     addSegDialog: addSegDialog, createSeg: createSeg, segBlockedReason: segBlockedReason,
-    splitBlocks: splitBlocks, renderSegs: renderSegs
+    splitBlocks: splitBlocks, renderSegs: renderSegs,
+    pagerHtml: pagerHtml, pageList: pageList, goPage: goPage, curPager: curPager
   };
 })();

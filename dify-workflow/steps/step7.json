@@ -1,0 +1,1079 @@
+{
+ "nodes": [
+  {
+   "data": {
+    "desc": "",
+    "type": "start",
+    "title": "开始",
+    "variables": [
+     {
+      "variable": "knowledge_file",
+      "label": "医学知识文件",
+      "description": "上传医学知识文件（txt/md/pdf/docx 等），系统会自动生成问答对并入库",
+      "type": "file-list",
+      "required": false,
+      "hide": false,
+      "default": null,
+      "max_length": null,
+      "options": [],
+      "allowed_file_types": [
+       "document"
+      ],
+      "allowed_file_extensions": [
+       ".TXT",
+       ".MD",
+       ".MARKDOWN",
+       ".PDF",
+       ".HTML",
+       ".HTM",
+       ".XLSX",
+       ".XLS",
+       ".DOCX",
+       ".DOC",
+       ".CSV",
+       ".EML",
+       ".MSG",
+       ".PPTX",
+       ".PPT",
+       ".XML",
+       ".EPUB",
+       ".JSON"
+      ],
+      "allowed_file_upload_methods": [
+       "local_file",
+       "remote_url"
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 72,
+   "id": "1788759963315",
+   "position": {
+    "x": 80,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 80,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "desc": "",
+    "type": "iteration",
+    "title": "循环检索知识库回答",
+    "start_node_id": "node_iteration_start",
+    "iterator_selector": [
+     "node_code_parse_q",
+     "questions"
+    ],
+    "iterator_input_type": "array[string]",
+    "output_selector": [
+     "llm",
+     "text"
+    ],
+    "output_type": "array[string]",
+    "is_parallel": false,
+    "parallel_nums": 10,
+    "error_handle_mode": "terminated",
+    "flatten_output": true,
+    "height": 250,
+    "width": 860,
+    "selected": false
+   },
+   "height": 250,
+   "id": "node_iteration",
+   "position": {
+    "x": 1300,
+    "y": 260
+   },
+   "positionAbsolute": {
+    "x": 1300,
+    "y": 260
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 860,
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "desc": "",
+    "isInIteration": true,
+    "selected": false,
+    "title": "",
+    "type": "iteration-start"
+   },
+   "height": 48,
+   "id": "node_iteration_start",
+   "position": {
+    "x": 24,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 24,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom-iteration-start",
+   "width": 44,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "desc": "",
+    "query_attachment_selector": [],
+    "query_variable_selector": [
+     "node_iteration",
+     "item"
+    ],
+    "retrieval_mode": "multiple",
+    "title": "知识检索",
+    "type": "knowledge-retrieval",
+    "multiple_retrieval_config": {
+     "top_k": 3,
+     "reranking_enable": true,
+     "reranking_model": {
+      "provider": "langgenius/siliconflow/siliconflow",
+      "model": "BAAI/bge-reranker-v2-m3"
+     },
+     "weights": {
+      "keyword_setting": {
+       "keyword_weight": 0
+      },
+      "weight_type": "customized",
+      "vector_setting": {
+       "embedding_provider_name": "langgenius/siliconflow/siliconflow",
+       "vector_weight": 1,
+       "embedding_model_name": "Pro/BAAI/bge-m3"
+      }
+     },
+     "score_threshold": 0.5,
+     "reranking_mode": "reranking_model"
+    },
+    "dataset_ids": [
+     "4657f032-fd37-4763-9208-1f8d907d244d",
+     "1850109b-6d81-4f7f-9138-28be896ba0b9",
+     "079a4b2b-6cac-43fa-b415-3363be7cef2b",
+     "55f0131b-7c4c-43ab-a9f9-d7884fe4dea0",
+     "5e2f6f97-17f9-400b-880a-a64774710f37",
+     "667de273-df3e-4f96-bf8b-ad68e5b32796",
+     "1098ee63-0ce6-41ea-b55f-cf7596573140",
+     "15d8084e-5807-40ae-b942-adbcb7721cf8",
+     "b98955c3-0637-433c-b0d1-8a80749f603b"
+    ],
+    "selected": false,
+    "isInIteration": true,
+    "isInLoop": false,
+    "iteration_id": "node_iteration"
+   },
+   "height": 51,
+   "id": "1788759983275",
+   "position": {
+    "x": 140,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 140,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 241,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "逐问作答",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-逐问作答",
+      "role": "system",
+      "text": "你是医学知识助手。请**只依据**下面《知识库检索结果》回答用户问题；若检索结果为空或与问题无关，直接回答「知识库中未找到相关内容」。不要编造。\n\n《知识库检索结果》：\n{{#context#}}"
+     },
+     {
+      "id": "usr-逐问作答",
+      "role": "user",
+      "text": "{{#node_iteration.item#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": true,
+     "variable_selector": [
+      "1788759983275",
+      "result"
+     ]
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false,
+    "isInIteration": true,
+    "isInLoop": false,
+    "iteration_id": "node_iteration"
+   },
+   "height": 72,
+   "id": "llm",
+   "position": {
+    "x": 470,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 470,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "type": "question-classifier",
+    "title": "问题分类器",
+    "desc": "判断用户这次输入的是「医学知识文件」还是「医学问题」",
+    "query_variable_selector": [
+     "1788759963315",
+     "sys.query"
+    ],
+    "classes": [
+     {
+      "id": "1",
+      "name": "医学知识文件",
+      "label": "CLASS 1"
+     },
+     {
+      "id": "2",
+      "name": "医学问题",
+      "label": "CLASS 2"
+     }
+    ],
+    "instruction": "如果用户上传了文件、或消息里说明要「上传/录入/整理一份医学知识资料」，归类为「医学知识文件」；其余提问一律归类为「医学问题」。",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.01
+     }
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_classifier",
+   "position": {
+    "x": 380,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 380,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "document-extractor",
+    "title": "文档提取器",
+    "desc": "读取上传文件里的纯文本",
+    "variable_selector": [
+     "sys",
+     "files"
+    ],
+    "selected": false
+   },
+   "height": 51,
+   "id": "node_doc_extractor",
+   "position": {
+    "x": 700,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 700,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "生成问答对",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-生成问答对",
+      "role": "system",
+      "text": "你是医学知识整理助手。请把给定的医学文档内容拆解成「问答对」。\n要求：\n1. 每行输出一个 JSON 对象，严格使用格式：{\"question\": \"问题\", \"response_chosen\": \"答案\"}\n2. 只输出 JSON，每行一个；不要输出解释、标题、Markdown 代码块或多余文字。\n3. 问题要具体、自然、可独立成问；答案必须完全依据文档内容，不得编造。\n4. 尽可能覆盖文档中的全部知识点。\n示例：{\"question\": \"什么是尿路刺激征？\", \"response_chosen\": \"是指膀胱颈和膀胱三角区受炎症或机械刺激而引起的尿频、尿急、尿痛，伴有排尿不尽感及下腹坠痛\"}"
+     },
+     {
+      "id": "usr-生成问答对",
+      "role": "user",
+      "text": "文档内容：\n{{#node_doc_extractor.text#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_gen_qa",
+   "position": {
+    "x": 1000,
+    "y": 60
+   },
+   "positionAbsolute": {
+    "x": 1000,
+    "y": 60
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "取文件名并转义",
+    "desc": "",
+    "code_language": "python3",
+    "code": "import json\ndef main(files: list, text: str) -> dict:\n    name = \"医学知识文件\"\n    try:\n        if files:\n            f = files[0]\n            if isinstance(f, dict):\n                name = f.get(\"name\") or f.get(\"filename\") or name\n    except Exception:\n        pass\n    name = str(name)\n    return {\n        \"filename\": name,\n        \"filename_esc\": json.dumps(name, ensure_ascii=False)[1:-1],\n        \"text_esc\": json.dumps(text or \"\", ensure_ascii=False)[1:-1],\n    }\n",
+    "variables": [
+     {
+      "variable": "files",
+      "value_selector": [
+       "sys",
+       "files"
+      ],
+      "value_type": "array[file]"
+     },
+     {
+      "variable": "text",
+      "value_selector": [
+       "node_llm_gen_qa",
+       "text"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "filename": {
+      "type": "string",
+      "children": null
+     },
+     "filename_esc": {
+      "type": "string",
+      "children": null
+     },
+     "text_esc": {
+      "type": "string",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_filename",
+   "position": {
+    "x": 1280,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 1280,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "http-request",
+    "title": "新建知识库",
+    "desc": "",
+    "method": "post",
+    "url": "http://api:5001/v1/datasets",
+    "authorization": {
+     "type": "api-key",
+     "config": {
+      "type": "bearer",
+      "api_key": "dataset-REPLACE_WITH_YOUR_KEY",
+      "header": ""
+     }
+    },
+    "headers": "Content-Type:application/json",
+    "params": "",
+    "body": {
+     "type": "json",
+     "data": [
+      {
+       "key": "",
+       "type": "text",
+       "value": "{\"name\": \"{{#node_code_filename.filename_esc#}}\", \"indexing_technique\": \"high_quality\", \"permission\": \"only_me\", \"provider\": \"vendor\", \"embedding_model\": \"Pro/BAAI/bge-m3\", \"embedding_model_provider\": \"langgenius/siliconflow/siliconflow\"}"
+      }
+     ]
+    },
+    "timeout": {
+     "connect": 10,
+     "read": 120,
+     "write": 60
+    },
+    "ssl_verify": true,
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_http_create_kb",
+   "position": {
+    "x": 1580,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 1580,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "取知识库ID",
+    "desc": "",
+    "code_language": "python3",
+    "code": "import json\ndef main(body: str) -> dict:\n    try:\n        data = json.loads(body)\n    except Exception:\n        return {\"dataset_id\": \"\", \"ok\": False, \"msg\": (body or \"\")[:300]}\n    did = data.get(\"id\", \"\") if isinstance(data, dict) else \"\"\n    return {\"dataset_id\": str(did), \"ok\": bool(did),\n            \"msg\": (body or \"\")[:300]}\n",
+    "variables": [
+     {
+      "variable": "body",
+      "value_selector": [
+       "node_http_create_kb",
+       "body"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "dataset_id": {
+      "type": "string",
+      "children": null
+     },
+     "ok": {
+      "type": "boolean",
+      "children": null
+     },
+     "msg": {
+      "type": "string",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_dataset",
+   "position": {
+    "x": 1880,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 1880,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "http-request",
+    "title": "写入问答对txt",
+    "desc": "",
+    "method": "post",
+    "url": "http://api:5001/v1/datasets/{{#node_code_dataset.dataset_id#}}/document/create-by-text",
+    "authorization": {
+     "type": "api-key",
+     "config": {
+      "type": "bearer",
+      "api_key": "dataset-REPLACE_WITH_YOUR_KEY",
+      "header": ""
+     }
+    },
+    "headers": "Content-Type:application/json",
+    "params": "",
+    "body": {
+     "type": "json",
+     "data": [
+      {
+       "key": "",
+       "type": "text",
+       "value": "{\"name\": \"{{#node_code_filename.filename_esc#}}\", \"text\": \"{{#node_code_filename.text_esc#}}\", \"indexing_technique\": \"high_quality\", \"process_rule\": {\"mode\": \"automatic\"}}"
+      }
+     ]
+    },
+    "timeout": {
+     "connect": 10,
+     "read": 120,
+     "write": 60
+    },
+    "ssl_verify": true,
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_http_add_doc",
+   "position": {
+    "x": 2180,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 2180,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "✅ 已处理文件《{{#node_code_filename.filename#}}》\n\n1. 已按文件名新建知识库：**{{#node_code_filename.filename#}}**\n2. 已将生成的问答对 txt 写入该知识库\n\n写入结果（原文）：\n{{#node_http_add_doc.body#}}",
+    "desc": "",
+    "type": "answer",
+    "title": "文件分支-回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "node_answer_file",
+   "position": {
+    "x": 2500,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 2500,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "生成五个相似问",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-生成五个相似问",
+      "role": "system",
+      "text": "你是医学问答助手。请把用户的问题改写成 5 个语义相同、但说法不同的提问，用于扩大知识库检索的召回范围。\n要求：\n1. 只输出一个 JSON 字符串数组，不要输出解释或 Markdown 代码块。\n2. 数组共 5 个字符串元素。\n3. 覆盖不同说法：口语化、书面化、近义症状描述、专业术语等。\n示例：[\"什么是尿路刺激征？\", \"尿路刺激征是什么意思？\", \"尿频尿急尿痛合称什么？\", \"膀胱刺激征的临床表现有哪些？\", \"小便次数多、憋不住、排尿疼是什么病？\"]"
+     },
+     {
+      "id": "usr-生成五个相似问",
+      "role": "user",
+      "text": "{{#sys.query#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_similar",
+   "position": {
+    "x": 700,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 700,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "解析相似问",
+    "desc": "",
+    "code_language": "python3",
+    "code": "import json, re\ndef main(text: str) -> dict:\n    s = (text or \"\").strip()\n    m = re.search(r\"\\[.*\\]\", s, re.S)\n    if m:\n        s = m.group(0)\n    try:\n        arr = json.loads(s)\n    except Exception:\n        arr = []\n    if not isinstance(arr, list):\n        arr = []\n    qs = []\n    for x in arr:\n        if isinstance(x, str) and x.strip():\n            qs.append(x.strip())\n        elif isinstance(x, dict):\n            q = x.get(\"question\") or x.get(\"q\")\n            if q:\n                qs.append(str(q).strip())\n    seen, out = set(), []\n    for q in qs:\n        if q not in seen:\n            seen.add(q)\n            out.append(q)\n    if not out:\n        out = [s] if s else [\"医学问题\"]\n    return {\"questions\": out}\n",
+    "variables": [
+     {
+      "variable": "text",
+      "value_selector": [
+       "node_llm_similar",
+       "text"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "questions": {
+      "type": "array[string]",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_parse_q",
+   "position": {
+    "x": 1000,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 1000,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "去重汇总作答",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-去重汇总作答",
+      "role": "system",
+      "text": "你是医学知识助手。下面是对同一个用户问题（{{#sys.query#}}）用多种相似问法分别检索知识库后得到的若干条回答。请：\n1. 去掉重复、冗余、与问题无关的内容；\n2. 合并成一个准确、完整、条理清晰的最终回答；\n3. 只依据这些内容作答，不得编造；若全部为空，说明「知识库中未找到相关内容」。"
+     },
+     {
+      "id": "usr-去重汇总作答",
+      "role": "user",
+      "text": "{{#node_iteration.output#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_final",
+   "position": {
+    "x": 2200,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 2200,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "{{#node_llm_final.text#}}",
+    "desc": "",
+    "type": "answer",
+    "title": "直接回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "answer",
+   "position": {
+    "x": 2500,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 2500,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  }
+ ],
+ "edges": [
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "start",
+    "targetType": "question-classifier",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "1788759963315-source-node_classifier-target",
+   "source": "1788759963315",
+   "sourceHandle": "source",
+   "target": "node_classifier",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "document-extractor",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-1-node_doc_extractor-target",
+   "source": "node_classifier",
+   "sourceHandle": "1",
+   "target": "node_doc_extractor",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "document-extractor",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_doc_extractor-source-node_llm_gen_qa-target",
+   "source": "node_doc_extractor",
+   "sourceHandle": "source",
+   "target": "node_llm_gen_qa",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_gen_qa-source-node_code_filename-target",
+   "source": "node_llm_gen_qa",
+   "sourceHandle": "source",
+   "target": "node_code_filename",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "http-request",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_filename-source-node_http_create_kb-target",
+   "source": "node_code_filename",
+   "sourceHandle": "source",
+   "target": "node_http_create_kb",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "http-request",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_http_create_kb-source-node_code_dataset-target",
+   "source": "node_http_create_kb",
+   "sourceHandle": "source",
+   "target": "node_code_dataset",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "http-request",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_dataset-source-node_http_add_doc-target",
+   "source": "node_code_dataset",
+   "sourceHandle": "source",
+   "target": "node_http_add_doc",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "http-request",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_http_add_doc-source-node_answer_file-target",
+   "source": "node_http_add_doc",
+   "sourceHandle": "source",
+   "target": "node_answer_file",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-2-node_llm_similar-target",
+   "source": "node_classifier",
+   "sourceHandle": "2",
+   "target": "node_llm_similar",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_similar-source-node_code_parse_q-target",
+   "source": "node_llm_similar",
+   "sourceHandle": "source",
+   "target": "node_code_parse_q",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "iteration",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_parse_q-source-node_iteration-target",
+   "source": "node_code_parse_q",
+   "sourceHandle": "source",
+   "target": "node_iteration",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": true,
+    "isInLoop": false,
+    "sourceType": "iteration-start",
+    "targetType": "knowledge-retrieval",
+    "iteration_id": "node_iteration",
+    "loop_id": null
+   },
+   "id": "node_iteration_start-source-1788759983275-target",
+   "source": "node_iteration_start",
+   "sourceHandle": "source",
+   "target": "1788759983275",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 1002
+  },
+  {
+   "data": {
+    "isInIteration": true,
+    "isInLoop": false,
+    "sourceType": "knowledge-retrieval",
+    "targetType": "llm",
+    "iteration_id": "node_iteration",
+    "loop_id": null
+   },
+   "id": "1788759983275-source-llm-target",
+   "source": "1788759983275",
+   "sourceHandle": "source",
+   "target": "llm",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 1002
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "iteration",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_iteration-source-node_llm_final-target",
+   "source": "node_iteration",
+   "sourceHandle": "source",
+   "target": "node_llm_final",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_final-source-answer-target",
+   "source": "node_llm_final",
+   "sourceHandle": "source",
+   "target": "answer",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  }
+ ],
+ "viewport": {
+  "x": -60,
+  "y": 40,
+  "zoom": 0.72
+ }
+}

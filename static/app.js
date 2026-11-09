@@ -1,5 +1,5 @@
 /* =========================================================================
-   医学知识智能问答 · 前端（问答5.0 版）
+   医学知识智能问答 · 前端
    后端：本机 Python 服务（账号 + 多会话 + Dify 代理 + 文件上传）
    接口：POST /api/upload → 转发 Dify /files/upload，返回 {ok, file:{id,name,size}}
         POST /api/chat   →  SSE: title / delta / replace / final / meta / end / error
@@ -156,13 +156,17 @@
   };
 
   /* ==================== 欢迎页 ==================== */
+  /* 欢迎页快捷问题：每一条都必须能在「检索库」里精准召回，否则用户一点就会收到
+     「知识库中未找到相关内容」。改动前先用 dev/find_kb_content.py "<问题>" 实测。
+     2026-10-14：原「一氧化碳中毒的救治原则」在库里只有「健康教育 / 预防」那条
+     （最高分仅 0.68，答非所问）→ 换成库里确有的「溺水的救治措施」（0.999）。 */
   var SAMPLES = [
     { ic: 'activity', t: '什么是院前急救', d: '院前急救的定义与救护阶段' },
     { ic: 'list', t: '院前急救的原则有哪些', d: '先排险后施救等七条基本原则' },
     { ic: 'flag', t: '现场急救的分区及标记有哪些', d: '红黄绿黑四区的优先级划分' },
     { ic: 'heart', t: '心脏骤停的临床表现有哪些', d: '意识、循环、呼吸、瞳孔的变化时序' },
     { ic: 'sun', t: '中暑的救治措施有哪些', d: '脱离高温、迅速降温与对症支持' },
-    { ic: 'wind', t: '一氧化碳中毒的救治原则是什么', d: '院外急救与院内救护要点' }
+    { ic: 'wind', t: '溺水的救治措施有哪些', d: '脱离水面、畅通气道与对症处理' }
   ];
 
   function renderWelcome() {
@@ -173,10 +177,10 @@
     }).join('');
     $('thread').innerHTML =
       '<div class="welcome">' +
-        '<div class="w-ic"><svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.4 8 10.5 4.6-1.1 8-5.5 8-10.5v-6L12 2Zm-1 13.5-3-3 1.4-1.4 1.6 1.6 4.2-4.2 1.4 1.4-5.6 5.6Z"/></svg></div>' +
-        '<h2>医学知识智能问答 · 问答5.0</h2>' +
-        '<p>基于 Dify 应用「问答5.0」：提问时先由模型生成 5 个相似问，逐问检索知识库后去重汇总作答；' +
-        '点左下角「📎 上传知识文件」可把资料自动生成问答对并写入知识库。以下问题均已实测可精准召回：</p>' +
+        '<div class="w-ic"><svg viewBox="0 0 24 24"><path d="M10.4 2.6h3.2a1 1 0 0 1 1 1v4.6h4.6a1 1 0 0 1 1 1v3.2a1 1 0 0 1-1 1h-4.6v4.6a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4.6H5.8a1 1 0 0 1-1-1v-3.2a1 1 0 0 1 1-1h4.6V3.6a1 1 0 0 1 1-1Z"/><path d="M3 20.4h3.1l1.4-3.1 1.8 5.2 1.7-3.4h10" fill="none" stroke="#8ff0c8" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div>' +
+        '<h2>医学知识智能问答</h2>' +
+        '<p>提问时先由模型生成 5 个相似问，逐问检索知识库后去重汇总作答；' +
+        '点左下角「上传知识文件」可把资料自动生成问答对并写入知识库。以下问题均已实测可精准召回：</p>' +
         '<div class="cards">' + cards + '</div>' +
         '<div class="notice">' + ICON.warn +
           '<div><b>免责声明：</b>本页面由 AI 依据知识库检索生成，仅供医学知识学习与参考，' +
@@ -562,7 +566,7 @@
           message: text,
           conversationId: state.currentId,
           files: files.map(function (f) { return { id: f.id, name: f.name }; }),
-          titleHint: ingest ? ('📎 ' + files[0].name) : ''
+          titleHint: ingest ? files[0].name : ''
         }),
         signal: state.controller.signal
       });
@@ -881,7 +885,7 @@
   function exportCurrent() {
     if (!state.messages.length) { toast('当前对话为空'); return; }
     var title = $('topTitle').textContent || '医学知识问答';
-    var md = '# ' + title + '\n\n> 由 Dify 应用「问答5.0」生成 · ' + new Date().toLocaleString('zh-CN') +
+    var md = '# ' + title + '\n\n> 由 Dify 应用「问答6.0」生成 · ' + new Date().toLocaleString('zh-CN') +
       '\n> 用户：' + (state.user ? state.user.username : '') +
       '\n> 免责声明：内容仅供医学知识参考，不能替代执业医师的诊断与治疗。\n\n---\n\n';
     state.messages.forEach(function (m) {
@@ -1077,6 +1081,11 @@
       if (window.innerWidth <= 860) $('side').classList.remove('on');
     });
     $('kbMask').addEventListener('click', function () { if (window.KB) window.KB.close(); });
+    $('btnStats').addEventListener('click', function () {
+      if (window.STATS) window.STATS.open();
+      if (window.innerWidth <= 860) $('side').classList.remove('on');
+    });
+    $('statsMask').addEventListener('click', function () { if (window.STATS) window.STATS.close(); });
     $('btnExport').addEventListener('click', exportCurrent);
     $('btnTheme').addEventListener('click', function () {
       var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1122,6 +1131,7 @@
       if (e.key === 'Escape') {
         closeDrawer();
         if (window.KB) window.KB.close();
+        if (window.STATS) window.STATS.close();
       }
     });
   }

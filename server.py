@@ -87,8 +87,8 @@ DEFAULT_CONFIG = {
     "dify": {
         # ---- 全局默认值：某个连接没写自己的值时回退到这里 ----
         "base_url": "http://127.0.0.1/v1",
-        "api_key": "app-xxxxxxxxxxxxxxxxxxxxxxxx",
-        "dataset_api_key": "dataset-xxxxxxxxxxxxxxxxxxxxxxxx",
+        "api_key": "app-REPLACE_WITH_YOUR_APP_KEY",
+        "dataset_api_key": "dataset-REPLACE_WITH_YOUR_DATASET_KEY",
         "app_type": "chatflow",
         "input_var": "query",
         "extra_inputs": {},
@@ -887,6 +887,10 @@ class Handler(BaseHTTPRequestHandler):
                 user = self.require_user()
                 return None if not user else self.handle_list_conversations(user)
 
+            if path == "/api/stats":
+                user = self.require_user()
+                return None if not user else self.handle_stats(user)
+
             m = re.match(r"^/api/conversations/([A-Za-z0-9_\-]+)/messages$", path)
             if m:
                 user = self.require_user()
@@ -1210,6 +1214,185 @@ class Handler(BaseHTTPRequestHandler):
             "messages": msgs,
         })
 
+    # ---------------- 对话历史统计仪表盘 ----------------
+    def handle_stats(self, user):
+        """聚合当前用户的问答数据：次数、高频问题、命中率、来源分布、趋势。
+
+        口径说明：
+          - 「问答次数」只统计真实提问（排除「上传知识文件入库」分支，该分支 user 消息
+            meta 带 files / assistant 消息 meta 带 ingest）。
+          - 「命中率」= 成功作答且带知识来源的回答数 / 成功作答的回答数（报错回答不计入
+            分母，避免拉低命中率）。
+          - 「来源分布」按回答的 sources[].dataset 聚合（normalize_sources 落盘字段）。
+        """
+        days_raw = self.qs().get("days", "30")
+        try:
+            days = int(str(days_raw).strip())
+        except Exception:
+            days = 30
+        since = time.time() - days * 86400 if days > 0 else None
+
+        conn = get_db()
+        if since is not None:
+            rows = conn.execute(
+                "SELECT role, content, meta, sources, is_error, created_at"
+                " FROM messages WHERE user_id = ? AND created_at >= ? ORDER BY id ASC",
+                (user["id"], since),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT role, content, meta, sources, is_error, created_at"
+                " FROM messages WHERE user_id = ? ORDER BY id ASC",
+                (user["id"],),
+            ).fetchall()
+        conn.close()
+
+        def _day(ts):
+            lt = time.localtime(ts)
+            return "%04d-%02d-%02d" % (lt.tm_year, lt.tm_mon, lt.tm_mday)
+
+        user_msgs = []
+        assistant_msgs = []
+        ingest_attempts = 0   # 上传入库尝试次数（带附件的 user 消息）
+        ingest_errors = 0     # 入库失败次数（Dify 报错 / 未返回内容）
+        ingest_nonmed = 0     # 非医学拦截次数（回答命中「不是医学相关知识」）
+        ingest_skipped = 0    # 空正文等其他「跳过入库」次数（未生成问答对）
+        for r in rows:
+            meta = None
+            if r["meta"]:
+                try:
+                    meta = json.loads(r["meta"])
+                except Exception:
+                    meta = None
+            if not isinstance(meta, dict):
+                meta = {}
+
+            if r["role"] == "user":
+                if meta.get("files"):
+                    # 上传入库分支：不算「问答」，但单独统计入库成功率
+                    ingest_attempts += 1
+                    if r["is_error"]:
+                        ingest_errors += 1
+                    continue
+                user_msgs.append({"content": r["content"], "created_at": r["created_at"]})
+            elif r["role"] == "assistant":
+                if meta.get("ingest"):
+                    # 入库分支的确认回答：区分「非医学拦截 / 空正文等跳过 / 成功入库」
+                    content = r["content"] or ""
+                    if ("不是医学相关知识" in content) or ("非医学" in content):
+                        ingest_nonmed += 1
+                    elif ("已跳过入库" in content) or ("没有可用于生成问答对的正文" in content):
+                        ingest_skipped += 1
+                    continue
+                sources = []
+                if r["sources"]:
+                    try:
+                        sources = json.loads(r["sources"])
+                    except Exception:
+                        sources = []
+                if not isinstance(sources, list):
+                    sources = []
+                assistant_msgs.append({
+                    "sources": sources,
+                    "is_error": bool(r["is_error"]),
+                    "created_at": r["created_at"],
+                    "meta": meta,
+                })
+
+        questions = len(user_msgs)
+        answered = sum(1 for m in assistant_msgs if not m["is_error"])
+        errors = len(assistant_msgs) - answered
+        kb_hits = sum(1 for m in assistant_msgs if not m["is_error"] and m["sources"])
+        hit_rate = round(kb_hits / answered, 4) if answered else 0.0
+
+        latencies = [m["meta"].get("latencyMs") for m in assistant_msgs
+                     if isinstance(m["meta"].get("latencyMs"), (int, float))]
+        avg_latency = int(round(sum(latencies) / len(latencies))) if latencies else None
+        total_tokens = sum(m["meta"].get("tokens") or 0 for m in assistant_msgs)
+
+        # 高频问题（去首尾空白、截断 40 字归一化）
+        qcount = {}
+        for m in user_msgs:
+            key = (m["content"] or "").strip()[:40]
+            if key:
+                qcount[key] = qcount.get(key, 0) + 1
+        top_questions = [
+            {"text": t, "count": c}
+            for t, c in sorted(qcount.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+        ]
+
+        # 来源分布
+        src_count = {}
+        for m in assistant_msgs:
+            for s in m["sources"]:
+                name = "未知来源"
+                if isinstance(s, dict):
+                    name = (s.get("dataset") or "").strip() or (s.get("name") or "").strip() or "未知来源"
+                src_count[name] = src_count.get(name, 0) + 1
+        total_hits = sum(src_count.values())
+        source_dist = [
+            {"dataset": k, "count": v, "ratio": round(v / total_hits, 4) if total_hits else 0.0}
+            for k, v in sorted(src_count.items(), key=lambda kv: -kv[1])
+        ]
+
+        # 入库成功率 / 非医学拦截量（上传入库分支单独统计，不混入问答口径）
+        ingest_success = max(0, ingest_attempts - ingest_errors - ingest_nonmed - ingest_skipped)
+        ingest_rate = round(ingest_success / ingest_attempts, 4) if ingest_attempts else None
+
+        # 按天趋势
+        trend_map = {}
+        for m in user_msgs:
+            d = _day(m["created_at"])
+            t = trend_map.setdefault(d, {"day": d, "questions": 0, "hits": 0})
+            t["questions"] += 1
+        for m in assistant_msgs:
+            if m["is_error"]:
+                continue
+            d = _day(m["created_at"])
+            t = trend_map.setdefault(d, {"day": d, "questions": 0, "hits": 0})
+            if m["sources"]:
+                t["hits"] += 1
+        trend = sorted(trend_map.values(), key=lambda x: x["day"])
+
+        # 若指定了时间窗，补齐区间内缺失的天（无数据的日子补 0），方便前端画连续折线
+        if since is not None:
+            filled = {}
+            day0 = _day(since)
+            dayN = _day(time.time())
+            d = day0
+            while d <= dayN:
+                filled[d] = {"day": d, "questions": 0, "hits": 0}
+                lt = time.localtime(time.mktime(time.strptime(d, "%Y-%m-%d")) + 86400)
+                d = _day(time.mktime(lt))
+            for t in trend:
+                filled[t["day"]] = t
+            trend = [filled[k] for k in sorted(filled.keys())]
+
+        self.send_json({
+            "ok": True,
+            "range": {"days": days, "from": since, "to": time.time()},
+            "totals": {
+                "questions": questions,
+                "answered": answered,
+                "errors": errors,
+                "kbHits": kb_hits,
+                "kbHitRate": hit_rate,
+                "avgLatencyMs": avg_latency,
+                "totalTokens": total_tokens,
+            },
+            "trend": trend,
+            "topQuestions": top_questions,
+            "sourceDist": source_dist,
+            "ingest": {
+                "attempts": ingest_attempts,
+                "success": ingest_success,
+                "nonMedical": ingest_nonmed,
+                "errors": ingest_errors,
+                "skipped": ingest_skipped,
+                "rate": ingest_rate,
+            },
+        })
+
     # ---------------- 知识库管理（转发 Dify Service API） ----------------
     KB_ROUTES = (
         ("retrieval", re.compile(r"^/api/kb/retrieval$")),
@@ -1287,16 +1470,38 @@ class Handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             return self.send_json({"ok": False, "error": "服务器内部错误：%s" % e}, 500)
 
+    def kb_all_datasets(self, keyword=""):
+        """拉全量知识库列表（Dify 单页最多 100 条，循环取完；最多 20 页防死循环）。
+
+        这里不再让 Dify 分页，是因为「检索库」要永远排在列表最前面：只有拿到全量
+        才能把落在后面页的检索库提到最前，再在本地切片分页。
+        """
+        out, page = [], 1
+        while page <= 20:
+            path = "/datasets?page=%d&limit=100" % page
+            if keyword:
+                path += "&keyword=" + quote(keyword)
+            obj = dify_ok("GET", path, timeout=40)
+            data = obj.get("data") or []
+            out.extend(data)
+            if not data or not obj.get("has_more"):
+                break
+            page += 1
+        return out
+
     def kb_list(self):
         q = self.qs()
         page = max(1, self.to_int(q.get("page"), 1))
         limit = min(100, max(1, self.to_int(q.get("limit"), 20)))
         keyword = (q.get("keyword") or "").strip()
-        path = "/datasets?page=%d&limit=%d" % (page, limit)
-        if keyword:
-            path += "&keyword=" + quote(keyword)
-        obj = dify_ok("GET", path, timeout=40)
-        items = obj.get("data") or []
+        items_all = self.kb_all_datasets(keyword)
+        # 「检索库」置顶：登记表里的库排在最前（多个检索库按登记顺序），其余保持
+        # Dify 的创建时间倒序。稳定排序 → 无论检索库原本在第几页，打开列表就能看到。
+        rank = {i: n for n, i in enumerate(retrieval_ids())}
+        items_all.sort(key=lambda it: rank.get(it.get("id"), len(rank)))
+        total = len(items_all)
+        start = (page - 1) * limit
+        items = items_all[start:start + limit]
         ids = [it.get("id") for it in items if it.get("id")]
         stats = {}
         if ids:
@@ -1308,8 +1513,8 @@ class Handler(BaseHTTPRequestHandler):
             "ok": True,
             "page": page,
             "limit": limit,
-            "total": obj.get("total"),
-            "hasMore": bool(obj.get("has_more")),
+            "total": total,
+            "hasMore": start + len(items) < total,
             "datasets": [norm_dataset(it, stats.get(it.get("id"))) for it in items],
         })
 

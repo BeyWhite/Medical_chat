@@ -1,7 +1,8 @@
 /* 「知识库管理 · 按钮配色」前端自检（jsdom）
    规范（方案 A · 语义三色）：
      ① 主操作   `btn pri sm`        → 文档管理 / 分段 / 新增分段
-     ② 次要操作 `btn gho sm`        → 编辑、启用/禁用、归档、搜索、清空、翻页、取消
+     ② 次要操作 `btn gho sm`        → 编辑、启用/禁用、归档、搜索、清空、上一页/下一页/跳转、取消
+   页码数字（1 2 3 …）用专属类 `.kb-pg`（非 `.btn`，自带 `.on` 高亮），页面跳转见 verify_pager_ui.mjs。
      ③ 破坏性   `btn gho sm dgr-txt` → 删除（弹窗确认用实心 `btn dgr`）
    并且：不得再出现第 4 种按钮色（例如 `pri-txt` 青色描边）；
         两处「搜索」必须同款；危险按钮的悬停底色须与文字同色系（--danger-soft）。
@@ -110,7 +111,13 @@ chk($('kbClearBtn') === null || has($('kbClearBtn'), 'gho'), '④ 「清空」�
 
 /* ---------- ⑤ 页脚翻页 ---------- */
 const pg = listOf(doc.querySelector('.kb-pager'), '.btn');
-chk(pg.length === 2 && pg.every((b) => has(b, 'gho') && !has(b, 'pri')), '⑤ 上一页 / 下一页都是灰描边', pg.map(desc));
+chk(pg.length >= 2 && pg.every((b) => has(b, 'gho') && !has(b, 'pri')),
+  '⑤ 翻页区 .btn（上一页 / 下一页 / 跳转）一律灰描边', pg.map(desc));
+const pgNums = listOf(doc.querySelector('.kb-pager'), '.kb-pg');
+chk(pgNums.length > 0 && pgNums.every((b) => !has(b, 'btn')),
+  '⑤ 页码按钮用专属 .kb-pg（不占 .btn，三色规范不受影响）', pgNums.length);
+chk(listOf(doc.querySelector('.kb-pager'), '.kb-pg.on').length === 1,
+  '⑤ 当前页页码有且只有一个 .on 高亮');
 
 /* ---------- ⑥ 弹窗：取消灰、确认蓝、危险确认橙 ---------- */
 click(doc.querySelector('.kb-card[data-ds="' + DS_ID + '"] [data-act="edit"]'));

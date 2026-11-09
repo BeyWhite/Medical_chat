@@ -1,0 +1,1814 @@
+{
+ "nodes": [
+  {
+   "data": {
+    "desc": "",
+    "type": "start",
+    "title": "开始",
+    "variables": [
+     {
+      "variable": "knowledge_file",
+      "label": "医学知识文件",
+      "description": "上传医学知识文件（txt/md/pdf/docx 等），系统会自动生成问答对并入库",
+      "type": "file-list",
+      "required": false,
+      "hide": false,
+      "default": null,
+      "max_length": null,
+      "options": [],
+      "allowed_file_types": [
+       "document"
+      ],
+      "allowed_file_extensions": [
+       ".TXT",
+       ".MD",
+       ".MARKDOWN",
+       ".PDF",
+       ".HTML",
+       ".HTM",
+       ".XLSX",
+       ".XLS",
+       ".DOCX",
+       ".DOC",
+       ".CSV",
+       ".EML",
+       ".MSG",
+       ".PPTX",
+       ".PPT",
+       ".XML",
+       ".EPUB",
+       ".JSON"
+      ],
+      "allowed_file_upload_methods": [
+       "local_file",
+       "remote_url"
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 72,
+   "id": "1788759963315",
+   "position": {
+    "x": 80,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 80,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "desc": "",
+    "type": "iteration",
+    "title": "循环检索知识库回答",
+    "start_node_id": "node_iteration_start",
+    "iterator_selector": [
+     "node_code_parse_q",
+     "questions"
+    ],
+    "iterator_input_type": "array[string]",
+    "output_selector": [
+     "llm",
+     "text"
+    ],
+    "output_type": "array[string]",
+    "is_parallel": false,
+    "parallel_nums": 10,
+    "error_handle_mode": "terminated",
+    "flatten_output": true,
+    "height": 250,
+    "width": 860,
+    "selected": false
+   },
+   "height": 250,
+   "id": "node_iteration",
+   "position": {
+    "x": 1300,
+    "y": 260
+   },
+   "positionAbsolute": {
+    "x": 1300,
+    "y": 260
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 860,
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "desc": "",
+    "isInIteration": true,
+    "selected": false,
+    "title": "",
+    "type": "iteration-start"
+   },
+   "height": 48,
+   "id": "node_iteration_start",
+   "position": {
+    "x": 24,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 24,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom-iteration-start",
+   "width": 44,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "desc": "",
+    "query_attachment_selector": [],
+    "query_variable_selector": [
+     "node_iteration",
+     "item"
+    ],
+    "retrieval_mode": "multiple",
+    "title": "知识检索",
+    "type": "knowledge-retrieval",
+    "multiple_retrieval_config": {
+     "top_k": 3,
+     "reranking_enable": true,
+     "reranking_model": {
+      "provider": "langgenius/siliconflow/siliconflow",
+      "model": "BAAI/bge-reranker-v2-m3"
+     },
+     "weights": {
+      "keyword_setting": {
+       "keyword_weight": 0
+      },
+      "weight_type": "customized",
+      "vector_setting": {
+       "embedding_provider_name": "langgenius/siliconflow/siliconflow",
+       "vector_weight": 1,
+       "embedding_model_name": "Pro/BAAI/bge-m3"
+      }
+     },
+     "score_threshold": 0.5,
+     "reranking_mode": "reranking_model"
+    },
+    "dataset_ids": [
+     "4657f032-fd37-4763-9208-1f8d907d244d",
+     "1850109b-6d81-4f7f-9138-28be896ba0b9",
+     "079a4b2b-6cac-43fa-b415-3363be7cef2b",
+     "55f0131b-7c4c-43ab-a9f9-d7884fe4dea0",
+     "5e2f6f97-17f9-400b-880a-a64774710f37",
+     "667de273-df3e-4f96-bf8b-ad68e5b32796",
+     "1098ee63-0ce6-41ea-b55f-cf7596573140",
+     "15d8084e-5807-40ae-b942-adbcb7721cf8",
+     "b98955c3-0637-433c-b0d1-8a80749f603b"
+    ],
+    "selected": false,
+    "isInIteration": true,
+    "isInLoop": false,
+    "iteration_id": "node_iteration"
+   },
+   "height": 51,
+   "id": "1788759983275",
+   "position": {
+    "x": 140,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 140,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 241,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "逐问作答",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-逐问作答",
+      "role": "system",
+      "text": "你是医学知识助手。请**只依据**下面《知识库检索结果》回答用户问题；若检索结果为空或与问题无关，直接回答「知识库中未找到相关内容」。不要编造。\n\n《知识库检索结果》：\n{{#context#}}"
+     },
+     {
+      "id": "usr-逐问作答",
+      "role": "user",
+      "text": "{{#node_iteration.item#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": true,
+     "variable_selector": [
+      "1788759983275",
+      "result"
+     ]
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false,
+    "isInIteration": true,
+    "isInLoop": false,
+    "iteration_id": "node_iteration"
+   },
+   "height": 72,
+   "id": "llm",
+   "position": {
+    "x": 470,
+    "y": 70
+   },
+   "positionAbsolute": {
+    "x": 470,
+    "y": 70
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 1002,
+   "parentId": "node_iteration"
+  },
+  {
+   "data": {
+    "type": "question-classifier",
+    "title": "问题分类器",
+    "desc": "判断用户这次输入的是「医学知识文件」还是「医学问题」",
+    "query_variable_selector": [
+     "1788759963315",
+     "sys.query"
+    ],
+    "classes": [
+     {
+      "id": "1",
+      "name": "医学知识文件",
+      "label": "CLASS 1"
+     },
+     {
+      "id": "2",
+      "name": "医学问题",
+      "label": "CLASS 2"
+     }
+    ],
+    "instruction": "如果用户上传了文件、或消息里说明要「上传/录入/整理一份医学知识资料」，归类为「医学知识文件」；其余提问一律归类为「医学问题」。",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.01
+     }
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_classifier",
+   "position": {
+    "x": 380,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 380,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "取文件名/判断来源",
+    "desc": "文件来自对话附件还是开始节点的文件变量",
+    "code_language": "python3",
+    "code": "import json\n\ndef _name_of(f):\n    if f is None:\n        return None\n    if isinstance(f, str):\n        return f or None\n    if isinstance(f, dict):\n        return f.get(\"name\") or f.get(\"filename\") or None\n    return getattr(f, \"name\", None) or getattr(f, \"filename\", None)\n\ndef _as_list(x):\n    if x is None:\n        return []\n    if isinstance(x, list):\n        return x\n    return [x]\n\ndef main(files: list, file_var) -> dict:\n    sys_files = _as_list(files)\n    var_files = _as_list(file_var)\n    if sys_files:\n        src = \"sys\"\n        name = _name_of(sys_files[0])\n    elif var_files:\n        src = \"var\"\n        name = _name_of(var_files[0])\n    else:\n        src = \"none\"\n        name = None\n    name = str(name) if name else \"医学知识文件\"\n    return {\n        \"filename\": name,\n        \"filename_esc\": json.dumps(name, ensure_ascii=False)[1:-1],\n        \"source\": src,\n        \"has_file\": src != \"none\",\n    }\n",
+    "variables": [
+     {
+      "variable": "files",
+      "value_selector": [
+       "sys",
+       "files"
+      ],
+      "value_type": "array[file]"
+     },
+     {
+      "variable": "file_var",
+      "value_selector": [
+       "1788759963315",
+       "knowledge_file"
+      ],
+      "value_type": "array[file]"
+     }
+    ],
+    "outputs": {
+     "filename": {
+      "type": "string",
+      "children": null
+     },
+     "filename_esc": {
+      "type": "string",
+      "children": null
+     },
+     "source": {
+      "type": "string",
+      "children": null
+     },
+     "has_file": {
+      "type": "boolean",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_filesrc",
+   "position": {
+    "x": 700,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 700,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "if-else",
+    "title": "判断文件来源",
+    "desc": "命中 1 = 用「医学知识文件」变量；否则（false）= 用对话附件或没有文件再判断",
+    "logical_operator": "and",
+    "cases": [
+     {
+      "case_id": "1",
+      "logical_operator": "and",
+      "conditions": [
+       {
+        "variable_selector": [
+         "node_code_filesrc",
+         "source"
+        ],
+        "comparison_operator": "is",
+        "value": "var"
+       }
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_if_filesrc",
+   "position": {
+    "x": 1000,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 1000,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "if-else",
+    "title": "是否有对话附件",
+    "desc": "命中 1 = 一个文件都没有，直接给提示",
+    "logical_operator": "and",
+    "cases": [
+     {
+      "case_id": "1",
+      "logical_operator": "and",
+      "conditions": [
+       {
+        "variable_selector": [
+         "node_code_filesrc",
+         "has_file"
+        ],
+        "comparison_operator": "is",
+        "value": false
+       }
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_if_hasfile",
+   "position": {
+    "x": 1180,
+    "y": -140
+   },
+   "positionAbsolute": {
+    "x": 1180,
+    "y": -140
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "document-extractor",
+    "title": "文档提取器(对话附件)",
+    "desc": "读取对话框附件里的纯文本",
+    "variable_selector": [
+     "sys",
+     "files"
+    ],
+    "error_strategy": "default-value",
+    "default_value": [
+     {
+      "key": "text",
+      "type": "string",
+      "value": ""
+     }
+    ],
+    "retry_config": {
+     "max_retries": 0,
+     "retry_interval": 0,
+     "retry_enabled": false
+    },
+    "selected": false
+   },
+   "height": 51,
+   "id": "node_ext_sys",
+   "position": {
+    "x": 1420,
+    "y": -240
+   },
+   "positionAbsolute": {
+    "x": 1420,
+    "y": -240
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "document-extractor",
+    "title": "文档提取器(文件变量)",
+    "desc": "读取开始节点「医学知识文件」里的纯文本",
+    "variable_selector": [
+     "1788759963315",
+     "knowledge_file"
+    ],
+    "error_strategy": "default-value",
+    "default_value": [
+     {
+      "key": "text",
+      "type": "string",
+      "value": ""
+     }
+    ],
+    "retry_config": {
+     "max_retries": 0,
+     "retry_interval": 0,
+     "retry_enabled": false
+    },
+    "selected": false
+   },
+   "height": 51,
+   "id": "node_ext_var",
+   "position": {
+    "x": 1420,
+    "y": 190
+   },
+   "positionAbsolute": {
+    "x": 1420,
+    "y": 190
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "没有收到文件内容。请在**对话框的附件按钮**上传文件，或在开始节点的「医学知识文件」里选择文件后重试。",
+    "desc": "",
+    "type": "answer",
+    "title": "提示-未上传文件",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "node_answer_hint",
+   "position": {
+    "x": 1420,
+    "y": 440
+   },
+   "positionAbsolute": {
+    "x": 1420,
+    "y": 440
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "variable-aggregator",
+    "title": "正文汇总",
+    "desc": "两条子路径只会跑一条",
+    "output_type": "array[string]",
+    "variables": [
+     [
+      "node_ext_sys",
+      "text"
+     ],
+     [
+      "node_ext_var",
+      "text"
+     ]
+    ],
+    "advanced_settings": {
+     "group_enabled": false,
+     "groups": []
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_agg_text",
+   "position": {
+    "x": 1700,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 1700,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "校验正文",
+    "desc": "判断文档是否真的提取出了正文内容",
+    "code_language": "python3",
+    "code": "def _flatten(x):\n    if x is None:\n        return \"\"\n    if isinstance(x, str):\n        return x\n    if isinstance(x, (list, tuple)):\n        return \"\\n\".join(_flatten(i) for i in x)\n    if isinstance(x, dict):\n        return str(x.get(\"text\") or x.get(\"content\") or \"\")\n    return str(x)\n\ndef main(doc_text, var_text, merged) -> dict:\n    parts = [_flatten(doc_text), _flatten(var_text), _flatten(merged)]\n    best = max(parts, key=lambda s: len(s.strip()))\n    n = len(best.strip())\n    ok = n >= 10  # 少于 10 个字符基本就是空的 / 提取失败\n    if ok:\n        reason = \"提取正常\"\n    else:\n        reason = (\"正文为空（可能原因：扫描件/图片型 PDF 无文字层；\"\n                  \"DOCX 结构损坏导致解析失败；文档本身为空）\")\n    return {\"ok\": ok, \"reason\": reason, \"doc_chars\": n}\n",
+    "variables": [
+     {
+      "variable": "doc_text",
+      "value_selector": [
+       "node_ext_sys",
+       "text"
+      ],
+      "value_type": "array[string]"
+     },
+     {
+      "variable": "var_text",
+      "value_selector": [
+       "node_ext_var",
+       "text"
+      ],
+      "value_type": "array[string]"
+     },
+     {
+      "variable": "merged",
+      "value_selector": [
+       "node_agg_text",
+       "output"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "ok": {
+      "type": "boolean",
+      "children": null
+     },
+     "reason": {
+      "type": "string",
+      "children": null
+     },
+     "doc_chars": {
+      "type": "number",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_check_text",
+   "position": {
+    "x": 1960,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 1960,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "if-else",
+    "title": "正文是否有效",
+    "desc": "命中 bad = 没提取到正文，给提示；false = 正常生成问答对并入库",
+    "logical_operator": "and",
+    "cases": [
+     {
+      "case_id": "bad",
+      "logical_operator": "and",
+      "conditions": [
+       {
+        "variable_selector": [
+         "node_code_check_text",
+         "ok"
+        ],
+        "comparison_operator": "is",
+        "value": false
+       }
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_if_text_ok",
+   "position": {
+    "x": 2220,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 2220,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "⚠️ 这份文件没有提取到可用于生成问答对的正文，已跳过入库。\n\n可能原因：\n- 文件是扫描件 / 图片型 PDF，没有文字层；\n- DOCX 内部结构损坏（例如内嵌图片 CRC 校验失败）；\n- 文档本身就是空的。\n\n已提取到的正文字符数：{{#node_code_check_text.doc_chars#}}\n（提示：{{#node_code_check_text.reason#}}）",
+    "desc": "",
+    "type": "answer",
+    "title": "提示-未能提取正文",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "node_answer_badfile",
+   "position": {
+    "x": 2220,
+    "y": 370
+   },
+   "positionAbsolute": {
+    "x": 2220,
+    "y": 370
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "生成问答对",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-生成问答对",
+      "role": "system",
+      "text": "你是医学知识整理助手。请把给定的医学文档内容拆解成「问答对」。\n要求：\n1. 每行输出一个 JSON 对象，严格使用格式：{\"question\": \"问题\", \"response_chosen\": \"答案\"}\n2. 只输出 JSON，每行一个；不要输出解释、标题、Markdown 代码块或多余文字。\n3. 问题要具体、自然、可独立成问；答案必须完全依据文档内容，不得编造。\n4. 尽可能覆盖文档中的全部知识点。\n示例：{\"question\": \"什么是尿路刺激征？\", \"response_chosen\": \"是指膀胱颈和膀胱三角区受炎症或机械刺激而引起的尿频、尿急、尿痛，伴有排尿不尽感及下腹坠痛\"}"
+     },
+     {
+      "id": "usr-生成问答对",
+      "role": "user",
+      "text": "文档内容：\n{{#node_agg_text.output#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_gen_qa",
+   "position": {
+    "x": 2480,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 2480,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "http-request",
+    "title": "查知识库列表",
+    "desc": "列出全部知识库，用于判断同名库是否已存在",
+    "method": "get",
+    "url": "http://api:5001/v1/datasets?limit=100",
+    "authorization": {
+     "type": "api-key",
+     "config": {
+      "type": "bearer",
+      "api_key": "dataset-REPLACE_WITH_YOUR_KEY",
+      "header": ""
+     }
+    },
+    "headers": "Content-Type:application/json",
+    "params": "",
+    "body": {
+     "type": "none",
+     "data": []
+    },
+    "timeout": {
+     "connect": 10,
+     "read": 120,
+     "write": 60
+    },
+    "ssl_verify": true,
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_http_list_kb",
+   "position": {
+    "x": 2760,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 2760,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "查找同名知识库",
+    "desc": "按文件名精确匹配已存在的知识库",
+    "code_language": "python3",
+    "code": "import json\n\ndef main(body: str, filename: str) -> dict:\n    name = (filename or \"\").strip()\n    items = []\n    try:\n        data = json.loads(body or \"{}\")\n        if isinstance(data, dict) and isinstance(data.get(\"data\"), list):\n            items = data[\"data\"]\n    except Exception:\n        items = []\n    did = \"\"\n    for it in items:\n        if isinstance(it, dict) and str(it.get(\"name\") or \"\").strip() == name:\n            did = str(it.get(\"id\") or \"\")\n            break\n    return {\n        \"dataset_id\": did,\n        \"exists\": bool(did),\n        \"matched\": did[:8] if did else \"\",\n    }\n",
+    "variables": [
+     {
+      "variable": "body",
+      "value_selector": [
+       "node_http_list_kb",
+       "body"
+      ],
+      "value_type": "string"
+     },
+     {
+      "variable": "filename",
+      "value_selector": [
+       "node_code_filesrc",
+       "filename"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "dataset_id": {
+      "type": "string",
+      "children": null
+     },
+     "exists": {
+      "type": "boolean",
+      "children": null
+     },
+     "matched": {
+      "type": "string",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_find_kb",
+   "position": {
+    "x": 3020,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 3020,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "if-else",
+    "title": "知识库是否已存在",
+    "desc": "不存在才去新建；已存在就直接复用，避免 409",
+    "logical_operator": "and",
+    "cases": [
+     {
+      "case_id": "create",
+      "logical_operator": "and",
+      "conditions": [
+       {
+        "variable_selector": [
+         "node_code_find_kb",
+         "exists"
+        ],
+        "comparison_operator": "is",
+        "value": false
+       }
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_if_kb",
+   "position": {
+    "x": 3280,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 3280,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "http-request",
+    "title": "新建知识库",
+    "desc": "按文件名新建知识库",
+    "method": "post",
+    "url": "http://api:5001/v1/datasets",
+    "authorization": {
+     "type": "api-key",
+     "config": {
+      "type": "bearer",
+      "api_key": "dataset-REPLACE_WITH_YOUR_KEY",
+      "header": ""
+     }
+    },
+    "headers": "Content-Type:application/json",
+    "params": "",
+    "body": {
+     "type": "json",
+     "data": [
+      {
+       "key": "",
+       "type": "text",
+       "value": "{\"name\": \"{{#node_code_filesrc.filename_esc#}}\", \"indexing_technique\": \"high_quality\", \"permission\": \"only_me\", \"provider\": \"vendor\", \"embedding_model\": \"Pro/BAAI/bge-m3\", \"embedding_model_provider\": \"langgenius/siliconflow/siliconflow\"}"
+      }
+     ]
+    },
+    "timeout": {
+     "connect": 10,
+     "read": 120,
+     "write": 60
+    },
+    "ssl_verify": true,
+    "selected": false,
+    "error_strategy": "default-value",
+    "default_value": [
+     {
+      "key": "body",
+      "type": "string",
+      "value": "{}"
+     },
+     {
+      "key": "status_code",
+      "type": "number",
+      "value": 0
+     }
+    ]
+   },
+   "height": 72,
+   "id": "node_http_create_kb",
+   "position": {
+    "x": 3560,
+    "y": -110
+   },
+   "positionAbsolute": {
+    "x": 3560,
+    "y": -110
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "确定知识库ID",
+    "desc": "已存在就用已有的，否则用刚新建的；顺便转义正文",
+    "code_language": "python3",
+    "code": "import json\n\ndef main(find_id: str, create_body: str, text: str) -> dict:\n    did = (find_id or \"\").strip()\n    how = \"复用已存在的知识库\"\n    if not did:\n        try:\n            data = json.loads(create_body or \"{}\")\n        except Exception:\n            data = {}\n        if isinstance(data, dict):\n            did = str(data.get(\"id\") or \"\")\n        how = \"新建知识库\" if did else \"未取到知识库ID（请看节点运行日志）\"\n    return {\n        \"dataset_id\": did,\n        \"how\": how,\n        \"text_esc\": json.dumps(text or \"\", ensure_ascii=False)[1:-1],\n    }\n",
+    "variables": [
+     {
+      "variable": "find_id",
+      "value_selector": [
+       "node_code_find_kb",
+       "dataset_id"
+      ],
+      "value_type": "string"
+     },
+     {
+      "variable": "create_body",
+      "value_selector": [
+       "node_http_create_kb",
+       "body"
+      ],
+      "value_type": "string"
+     },
+     {
+      "variable": "text",
+      "value_selector": [
+       "node_llm_gen_qa",
+       "text"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "dataset_id": {
+      "type": "string",
+      "children": null
+     },
+     "how": {
+      "type": "string",
+      "children": null
+     },
+     "text_esc": {
+      "type": "string",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_decide_id",
+   "position": {
+    "x": 3860,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 3860,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "http-request",
+    "title": "写入问答对txt",
+    "desc": "",
+    "method": "post",
+    "url": "http://api:5001/v1/datasets/{{#node_code_decide_id.dataset_id#}}/document/create-by-text",
+    "authorization": {
+     "type": "api-key",
+     "config": {
+      "type": "bearer",
+      "api_key": "dataset-REPLACE_WITH_YOUR_KEY",
+      "header": ""
+     }
+    },
+    "headers": "Content-Type:application/json",
+    "params": "",
+    "body": {
+     "type": "json",
+     "data": [
+      {
+       "key": "",
+       "type": "text",
+       "value": "{\"name\": \"{{#node_code_filesrc.filename_esc#}}\", \"text\": \"{{#node_code_decide_id.text_esc#}}\", \"indexing_technique\": \"high_quality\", \"process_rule\": {\"mode\": \"automatic\"}}"
+      }
+     ]
+    },
+    "timeout": {
+     "connect": 10,
+     "read": 120,
+     "write": 60
+    },
+    "ssl_verify": true,
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_http_add_doc",
+   "position": {
+    "x": 4140,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 4140,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "✅ 已处理文件《{{#node_code_filesrc.filename#}}》\n\n- 知识库：**{{#node_code_filesrc.filename#}}**（{{#node_code_decide_id.how#}}）\n- 知识库 ID：`{{#node_code_decide_id.dataset_id#}}`\n- 生成的问答对：\n```\n{{#node_llm_gen_qa.text#}}\n```",
+    "desc": "",
+    "type": "answer",
+    "title": "文件分支-回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "node_answer_file",
+   "position": {
+    "x": 4440,
+    "y": 40
+   },
+   "positionAbsolute": {
+    "x": 4440,
+    "y": 40
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "生成五个相似问",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-生成五个相似问",
+      "role": "system",
+      "text": "你是医学问答助手。请把用户的问题改写成 5 个语义相同、但说法不同的提问，用于扩大知识库检索的召回范围。\n要求：\n1. 只输出一个 JSON 字符串数组，不要输出解释或 Markdown 代码块。\n2. 数组共 5 个字符串元素。\n3. 覆盖不同说法：口语化、书面化、近义症状描述、专业术语等。\n示例：[\"什么是尿路刺激征？\", \"尿路刺激征是什么意思？\", \"尿频尿急尿痛合称什么？\", \"膀胱刺激征的临床表现有哪些？\", \"小便次数多、憋不住、排尿疼是什么病？\"]"
+     },
+     {
+      "id": "usr-生成五个相似问",
+      "role": "user",
+      "text": "{{#sys.query#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_similar",
+   "position": {
+    "x": 700,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 700,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "code",
+    "title": "解析相似问",
+    "desc": "",
+    "code_language": "python3",
+    "code": "import json, re\ndef main(text: str) -> dict:\n    s = (text or \"\").strip()\n    m = re.search(r\"\\[.*\\]\", s, re.S)\n    if m:\n        s = m.group(0)\n    try:\n        arr = json.loads(s)\n    except Exception:\n        arr = []\n    if not isinstance(arr, list):\n        arr = []\n    qs = []\n    for x in arr:\n        if isinstance(x, str) and x.strip():\n            qs.append(x.strip())\n        elif isinstance(x, dict):\n            q = x.get(\"question\") or x.get(\"q\")\n            if q:\n                qs.append(str(q).strip())\n    seen, out = set(), []\n    for q in qs:\n        if q not in seen:\n            seen.add(q)\n            out.append(q)\n    if not out:\n        out = [s] if s else [\"医学问题\"]\n    return {\"questions\": out}\n",
+    "variables": [
+     {
+      "variable": "text",
+      "value_selector": [
+       "node_llm_similar",
+       "text"
+      ],
+      "value_type": "string"
+     }
+    ],
+    "outputs": {
+     "questions": {
+      "type": "array[string]",
+      "children": null
+     }
+    },
+    "dependencies": [],
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_code_parse_q",
+   "position": {
+    "x": 1000,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 1000,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "llm",
+    "title": "去重汇总作答",
+    "desc": "",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.3
+     }
+    },
+    "prompt_template": [
+     {
+      "id": "sys-去重汇总作答",
+      "role": "system",
+      "text": "你是医学知识助手。下面是对同一个用户问题（{{#sys.query#}}）用多种相似问法分别检索知识库后得到的若干条回答。请：\n1. 去掉重复、冗余、与问题无关的内容；\n2. 合并成一个准确、完整、条理清晰的最终回答；\n3. 只依据这些内容作答，不得编造；若全部为空，说明「知识库中未找到相关内容」。"
+     },
+     {
+      "id": "usr-去重汇总作答",
+      "role": "user",
+      "text": "{{#node_iteration.output#}}"
+     }
+    ],
+    "prompt_config": {
+     "jinja2_variables": []
+    },
+    "memory": null,
+    "context": {
+     "enabled": false,
+     "variable_selector": null
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "node_llm_final",
+   "position": {
+    "x": 2200,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 2200,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "{{#node_llm_final.text#}}",
+    "desc": "",
+    "type": "answer",
+    "title": "直接回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "answer",
+   "position": {
+    "x": 2500,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 2500,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  }
+ ],
+ "edges": [
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "start",
+    "targetType": "question-classifier",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "1788759963315-source-node_classifier-target",
+   "source": "1788759963315",
+   "sourceHandle": "source",
+   "target": "node_classifier",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-1-node_code_filesrc-target",
+   "source": "node_classifier",
+   "sourceHandle": "1",
+   "target": "node_code_filesrc",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "if-else",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_filesrc-source-node_if_filesrc-target",
+   "source": "node_code_filesrc",
+   "sourceHandle": "source",
+   "target": "node_if_filesrc",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "document-extractor",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_filesrc-1-node_ext_var-target",
+   "source": "node_if_filesrc",
+   "sourceHandle": "1",
+   "target": "node_ext_var",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "if-else",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_filesrc-false-node_if_hasfile-target",
+   "source": "node_if_filesrc",
+   "sourceHandle": "false",
+   "target": "node_if_hasfile",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_hasfile-1-node_answer_hint-target",
+   "source": "node_if_hasfile",
+   "sourceHandle": "1",
+   "target": "node_answer_hint",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "document-extractor",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_hasfile-false-node_ext_sys-target",
+   "source": "node_if_hasfile",
+   "sourceHandle": "false",
+   "target": "node_ext_sys",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "document-extractor",
+    "targetType": "variable-aggregator",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_ext_sys-source-node_agg_text-target",
+   "source": "node_ext_sys",
+   "sourceHandle": "source",
+   "target": "node_agg_text",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "document-extractor",
+    "targetType": "variable-aggregator",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_ext_var-source-node_agg_text-target",
+   "source": "node_ext_var",
+   "sourceHandle": "source",
+   "target": "node_agg_text",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "variable-aggregator",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_agg_text-source-node_code_check_text-target",
+   "source": "node_agg_text",
+   "sourceHandle": "source",
+   "target": "node_code_check_text",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "if-else",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_check_text-source-node_if_text_ok-target",
+   "source": "node_code_check_text",
+   "sourceHandle": "source",
+   "target": "node_if_text_ok",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_text_ok-bad-node_answer_badfile-target",
+   "source": "node_if_text_ok",
+   "sourceHandle": "bad",
+   "target": "node_answer_badfile",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_text_ok-false-node_llm_gen_qa-target",
+   "source": "node_if_text_ok",
+   "sourceHandle": "false",
+   "target": "node_llm_gen_qa",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "http-request",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_gen_qa-source-node_http_list_kb-target",
+   "source": "node_llm_gen_qa",
+   "sourceHandle": "source",
+   "target": "node_http_list_kb",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "http-request",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_http_list_kb-source-node_code_find_kb-target",
+   "source": "node_http_list_kb",
+   "sourceHandle": "source",
+   "target": "node_code_find_kb",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "if-else",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_find_kb-source-node_if_kb-target",
+   "source": "node_code_find_kb",
+   "sourceHandle": "source",
+   "target": "node_if_kb",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "http-request",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_kb-create-node_http_create_kb-target",
+   "source": "node_if_kb",
+   "sourceHandle": "create",
+   "target": "node_http_create_kb",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "if-else",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_if_kb-false-node_code_decide_id-target",
+   "source": "node_if_kb",
+   "sourceHandle": "false",
+   "target": "node_code_decide_id",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "http-request",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_http_create_kb-source-node_code_decide_id-target",
+   "source": "node_http_create_kb",
+   "sourceHandle": "source",
+   "target": "node_code_decide_id",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "http-request",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_decide_id-source-node_http_add_doc-target",
+   "source": "node_code_decide_id",
+   "sourceHandle": "source",
+   "target": "node_http_add_doc",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "http-request",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_http_add_doc-source-node_answer_file-target",
+   "source": "node_http_add_doc",
+   "sourceHandle": "source",
+   "target": "node_answer_file",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-2-node_llm_similar-target",
+   "source": "node_classifier",
+   "sourceHandle": "2",
+   "target": "node_llm_similar",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "code",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_similar-source-node_code_parse_q-target",
+   "source": "node_llm_similar",
+   "sourceHandle": "source",
+   "target": "node_code_parse_q",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "code",
+    "targetType": "iteration",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_code_parse_q-source-node_iteration-target",
+   "source": "node_code_parse_q",
+   "sourceHandle": "source",
+   "target": "node_iteration",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": true,
+    "isInLoop": false,
+    "sourceType": "iteration-start",
+    "targetType": "knowledge-retrieval",
+    "iteration_id": "node_iteration",
+    "loop_id": null
+   },
+   "id": "node_iteration_start-source-1788759983275-target",
+   "source": "node_iteration_start",
+   "sourceHandle": "source",
+   "target": "1788759983275",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 1002
+  },
+  {
+   "data": {
+    "isInIteration": true,
+    "isInLoop": false,
+    "sourceType": "knowledge-retrieval",
+    "targetType": "llm",
+    "iteration_id": "node_iteration",
+    "loop_id": null
+   },
+   "id": "1788759983275-source-llm-target",
+   "source": "1788759983275",
+   "sourceHandle": "source",
+   "target": "llm",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 1002
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "iteration",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_iteration-source-node_llm_final-target",
+   "source": "node_iteration",
+   "sourceHandle": "source",
+   "target": "node_llm_final",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_llm_final-source-answer-target",
+   "source": "node_llm_final",
+   "sourceHandle": "source",
+   "target": "answer",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  }
+ ],
+ "viewport": {
+  "x": -60,
+  "y": 40,
+  "zoom": 0.72
+ }
+}

@@ -1,0 +1,390 @@
+{
+ "nodes": [
+  {
+   "data": {
+    "desc": "",
+    "type": "start",
+    "title": "开始",
+    "variables": [
+     {
+      "variable": "knowledge_file",
+      "label": "医学知识文件",
+      "description": "上传医学知识文件（txt/md/pdf/docx 等），系统会自动生成问答对并入库",
+      "type": "file-list",
+      "required": false,
+      "hide": false,
+      "default": null,
+      "max_length": null,
+      "options": [],
+      "allowed_file_types": [
+       "document"
+      ],
+      "allowed_file_extensions": [
+       ".TXT",
+       ".MD",
+       ".MARKDOWN",
+       ".PDF",
+       ".HTML",
+       ".HTM",
+       ".XLSX",
+       ".XLS",
+       ".DOCX",
+       ".DOC",
+       ".CSV",
+       ".EML",
+       ".MSG",
+       ".PPTX",
+       ".PPT",
+       ".XML",
+       ".EPUB",
+       ".JSON"
+      ],
+      "allowed_file_upload_methods": [
+       "local_file",
+       "remote_url"
+      ]
+     }
+    ],
+    "selected": false
+   },
+   "height": 72,
+   "id": "1788759963315",
+   "position": {
+    "x": 80,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 80,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "desc": "",
+    "query_attachment_selector": [],
+    "query_variable_selector": [
+     "1788759963315",
+     "sys.query"
+    ],
+    "retrieval_mode": "multiple",
+    "title": "知识检索",
+    "type": "knowledge-retrieval",
+    "multiple_retrieval_config": {
+     "top_k": 3,
+     "reranking_enable": true,
+     "reranking_model": {
+      "provider": "langgenius/siliconflow/siliconflow",
+      "model": "BAAI/bge-reranker-v2-m3"
+     },
+     "weights": {
+      "keyword_setting": {
+       "keyword_weight": 0
+      },
+      "weight_type": "customized",
+      "vector_setting": {
+       "embedding_provider_name": "langgenius/siliconflow/siliconflow",
+       "vector_weight": 1,
+       "embedding_model_name": "Pro/BAAI/bge-m3"
+      }
+     },
+     "score_threshold": 0.5,
+     "reranking_mode": "reranking_model"
+    },
+    "dataset_ids": [
+     "4657f032-fd37-4763-9208-1f8d907d244d",
+     "1850109b-6d81-4f7f-9138-28be896ba0b9",
+     "079a4b2b-6cac-43fa-b415-3363be7cef2b",
+     "55f0131b-7c4c-43ab-a9f9-d7884fe4dea0",
+     "5e2f6f97-17f9-400b-880a-a64774710f37",
+     "667de273-df3e-4f96-bf8b-ad68e5b32796",
+     "1098ee63-0ce6-41ea-b55f-cf7596573140",
+     "15d8084e-5807-40ae-b942-adbcb7721cf8",
+     "b98955c3-0637-433c-b0d1-8a80749f603b"
+    ],
+    "selected": false
+   },
+   "height": 51,
+   "id": "1788759983275",
+   "position": {
+    "x": 700,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 700,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 241,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "variables": [],
+    "prompt_template": [
+     {
+      "id": "d64e5603-0eff-4f10-bff8-fae65c054ada",
+      "role": "system",
+      "text": "针对问题{{#sys.query#}}和知识库返回的内容{{#context#}}，进行润色，只返回问题相关的内容，只要总结结果"
+     },
+     {
+      "id": "80f4d397-5a1a-4fb4-8949-ba1a0e2b7577",
+      "role": "user",
+      "text": ""
+     }
+    ],
+    "desc": "",
+    "context": {
+     "enabled": true,
+     "variable_selector": [
+      "1788759983275",
+      "result"
+     ]
+    },
+    "title": "LLM",
+    "type": "llm",
+    "memory": {
+     "query_prompt_template": "{{#sys.query#}}",
+     "role_prefix": {
+      "assistant": "",
+      "user": ""
+     },
+     "window": {
+      "size": 10,
+      "enabled": false
+     }
+    },
+    "vision": {
+     "enabled": false
+    },
+    "model": {
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "provider": "langgenius/siliconflow/siliconflow",
+     "completion_params": {},
+     "mode": "chat"
+    },
+    "selected": false
+   },
+   "height": 72,
+   "id": "llm",
+   "position": {
+    "x": 1000,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 1000,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "type": "question-classifier",
+    "title": "问题分类器",
+    "desc": "判断用户这次输入的是「医学知识文件」还是「医学问题」",
+    "query_variable_selector": [
+     "1788759963315",
+     "sys.query"
+    ],
+    "classes": [
+     {
+      "id": "1",
+      "name": "医学知识文件",
+      "label": "CLASS 1"
+     },
+     {
+      "id": "2",
+      "name": "医学问题",
+      "label": "CLASS 2"
+     }
+    ],
+    "instruction": "如果用户上传了文件、或消息里说明要「上传/录入/整理一份医学知识资料」，归类为「医学知识文件」；其余提问一律归类为「医学问题」。",
+    "model": {
+     "provider": "langgenius/siliconflow/siliconflow",
+     "name": "deepseek-ai/DeepSeek-V3.2",
+     "mode": "chat",
+     "completion_params": {
+      "temperature": 0.01
+     }
+    },
+    "vision": {
+     "enabled": false
+    },
+    "selected": false
+   },
+   "height": 112,
+   "id": "node_classifier",
+   "position": {
+    "x": 380,
+    "y": 320
+   },
+   "positionAbsolute": {
+    "x": 380,
+    "y": 320
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "已进入「医学知识文件」分支（该分支还在搭建中）。",
+    "desc": "",
+    "type": "answer",
+    "title": "文件分支-回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "node_answer_file",
+   "position": {
+    "x": 1300,
+    "y": 120
+   },
+   "positionAbsolute": {
+    "x": 1300,
+    "y": 120
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "answer": "{{#llm.text#}}",
+    "desc": "",
+    "type": "answer",
+    "title": "直接回复",
+    "variables": [],
+    "selected": false
+   },
+   "height": 101,
+   "id": "answer",
+   "position": {
+    "x": 2500,
+    "y": 460
+   },
+   "positionAbsolute": {
+    "x": 2500,
+    "y": 460
+   },
+   "selected": false,
+   "sourcePosition": "right",
+   "targetPosition": "left",
+   "type": "custom",
+   "width": 242,
+   "zIndex": 0
+  }
+ ],
+ "edges": [
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "start",
+    "targetType": "question-classifier",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "1788759963315-source-node_classifier-target",
+   "source": "1788759963315",
+   "sourceHandle": "source",
+   "target": "node_classifier",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-1-node_answer_file-target",
+   "source": "node_classifier",
+   "sourceHandle": "1",
+   "target": "node_answer_file",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "question-classifier",
+    "targetType": "knowledge-retrieval",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "node_classifier-2-1788759983275-target",
+   "source": "node_classifier",
+   "sourceHandle": "2",
+   "target": "1788759983275",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "knowledge-retrieval",
+    "targetType": "llm",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "1788759983275-source-llm-target",
+   "source": "1788759983275",
+   "sourceHandle": "source",
+   "target": "llm",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  },
+  {
+   "data": {
+    "isInIteration": false,
+    "isInLoop": false,
+    "sourceType": "llm",
+    "targetType": "answer",
+    "iteration_id": null,
+    "loop_id": null
+   },
+   "id": "llm-source-answer-target",
+   "source": "llm",
+   "sourceHandle": "source",
+   "target": "answer",
+   "targetHandle": "target",
+   "type": "custom",
+   "zIndex": 0
+  }
+ ],
+ "viewport": {
+  "x": -60,
+  "y": 40,
+  "zoom": 0.72
+ }
+}

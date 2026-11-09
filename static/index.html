@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0891b2">
-<title>医学知识智能问答 · 问答5.0</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230e7490'/%3E%3Cpath d='M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z' fill='white'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f9d70">
+<title>医学知识智能问答</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230f766e'/%3E%3Cpath d='M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -13,15 +13,19 @@
 <!-- ==================== 登录 / 注册 ==================== -->
 <div class="auth" id="authView">
   <span class="auth-blob b1"></span><span class="auth-blob b2"></span><span class="auth-blob b3"></span>
+  <svg class="auth-ecg" viewBox="0 0 1440 210" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 118 H250 l16 -14 l10 30 l12 -22 l8 6 H520 l20 -58 l16 116 l14 -78 l12 20 H900 l16 -12 l10 26 l12 -18 l8 4 H1440"/>
+    <path class="p2" d="M0 150 H300 l18 -46 l14 92 l12 -62 l10 16 H760 l18 -44 l14 88 l12 -60 l10 16 H1440"/>
+  </svg>
 
   <div class="auth-card">
     <div class="auth-brand">
       <div class="auth-logo">
-        <svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.4 8 10.5 4.6-1.1 8-5.5 8-10.5v-6L12 2Zm-1 13.5-3-3 1.4-1.4 1.6 1.6 4.2-4.2 1.4 1.4-5.6 5.6Z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M10.4 2.6h3.2a1 1 0 0 1 1 1v4.6h4.6a1 1 0 0 1 1 1v3.2a1 1 0 0 1-1 1h-4.6v4.6a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4.6H5.8a1 1 0 0 1-1-1v-3.2a1 1 0 0 1 1-1h4.6V3.6a1 1 0 0 1 1-1Z"/><path d="M3 20.4h3.1l1.4-3.1 1.8 5.2 1.7-3.4h10" fill="none" stroke="#8ff0c8" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
       </div>
       <div>
         <h1>医学知识智能问答</h1>
-        <p id="authSub">基于 Dify「问答5.0」· 相似问多轮检索 + 知识文件自动入库</p>
+        <p id="authSub">临床辅助 · 知识循证 · 相似问多轮检索</p>
       </div>
     </div>
 
@@ -72,7 +76,7 @@
     <div class="side-head">
       <div class="brand">
         <div class="brand-logo">
-          <svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.4 8 10.5 4.6-1.1 8-5.5 8-10.5v-6L12 2Zm-1 13.5-3-3 1.4-1.4 1.6 1.6 4.2-4.2 1.4 1.4-5.6 5.6Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M10.4 2.6h3.2a1 1 0 0 1 1 1v4.6h4.6a1 1 0 0 1 1 1v3.2a1 1 0 0 1-1 1h-4.6v4.6a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4.6H5.8a1 1 0 0 1-1-1v-3.2a1 1 0 0 1 1-1h4.6V3.6a1 1 0 0 1 1-1Z"/><path d="M3 20.4h3.1l1.4-3.1 1.8 5.2 1.7-3.4h10" fill="none" stroke="#8ff0c8" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </div>
         <div class="brand-txt">
           <h1>医学知识问答</h1>
@@ -97,6 +101,10 @@
       <button class="side-foot-btn" id="btnKb">
         <svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6.5A2.5 2.5 0 0 0 4 22.5"/><path d="M4 6.5v16"/></svg>
         知识库管理
+      </button>
+      <button class="side-foot-btn" id="btnStats">
+        <svg viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+        数据统计
       </button>
       <button class="side-foot-btn" id="btnExport">
         <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -138,14 +146,13 @@
       <div class="composer-in">
         <div class="box" id="box">
           <div class="files-bar" id="filesBar" hidden></div>
-          <textarea id="q" rows="1" placeholder="输入医学问题，如：什么是院前急救？也可点左下角 📎 上传医学知识文件自动入库。（Enter 发送，Shift+Enter 换行）"></textarea>
+          <textarea id="q" rows="1" placeholder="输入医学问题，或点左下角上传知识文件"></textarea>
           <div class="row">
             <div class="hint">
               <button type="button" class="attach" id="btnAttach" title="上传医学知识文件（txt/md/pdf/docx/xlsx/pptx 等），系统会自动生成问答对并写入知识库">
                 <svg viewBox="0 0 24 24"><path d="M21.4 11.05 12.3 20.2a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.85 1.85 0 0 1-2.6-2.6l7.8-7.8"/></svg>
                 <span>上传知识文件</span>
               </button>
-              <span class="hint-txt"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
             </div>
             <button class="send" id="send">
               <svg viewBox="0 0 24 24" id="sendIcon"><path d="M4 12l16-8-6 8 6 8-16-8Z"/></svg>
@@ -181,7 +188,7 @@
 
     <div class="fg">
       <label>连接名称</label>
-      <input type="text" id="cfgAppName" placeholder="例如：问答5.0 / 智能问答02 / 急救知识库问答">
+      <input type="text" id="cfgAppName" placeholder="例如：问答6.0 / 智能问答02 / 急救知识库问答">
       <div class="desc">只用来在下拉里认出这条连接，随便起。</div>
     </div>
 
@@ -210,7 +217,7 @@
         <option value="chatflow">对话流 Chatflow（/chat-messages，带上下文）</option>
         <option value="workflow">工作流 Workflow（/workflows/run，单次执行）</option>
       </select>
-      <div class="desc">属于<b>当前所选连接</b>。保存后会随「工作流」一起记到这条连接上（留空 = 沿用全局默认）。「问答5.0」实测为 <b>advanced-chat（对话流）</b>，保持默认即可。</div>
+      <div class="desc">属于<b>当前所选连接</b>。保存后会随「工作流」一起记到这条连接上（留空 = 沿用全局默认）。「问答6.0」实测为 <b>advanced-chat（对话流）</b>，保持默认即可。</div>
     </div>
 
     <div class="fg" id="fgInputVar" hidden>
@@ -233,13 +240,13 @@
     <div class="fg">
       <label>请求超时（秒）</label>
       <input type="number" id="cfgTimeout" min="10" max="2400" placeholder="900">
-      <div class="desc">问答5.0 的问答分支要跑「5 个相似问 → 逐问检索作答 → 汇总」，耗时较长，建议不小于 600 秒。</div>
+      <div class="desc">当前工作流的问答分支要跑「5 个相似问 → 逐问检索作答 → 汇总」，耗时较长，建议不小于 600 秒。</div>
     </div>
 
     <div class="tip">
       <b>访问点自测：</b>服务端会请求 Dify 的 <code>/info</code> 自动探测，命中后顶栏状态点变绿并显示应用名。点顶栏状态点可随时重新检测。<br><br>
       <b>两条分支：</b>①<b>不传文件</b> = 医学问题检索问答（生成 5 个相似问 → 循环检索知识库 → 去重汇总作答，带知识来源）；②<b>传文件</b> = 知识文件自动入库（提取正文 → 生成问答对 → 按文件名新建/复用知识库 → 写入，回答里给出知识库 ID）。<br><br>
-      <b>文件入口：</b>点输入框左下角的「📎 上传知识文件」按钮，选中的文件会先上传到 Dify，随下一条消息一起提交。<br><br>
+      <b>文件入口：</b>点输入框左下角的「上传知识文件」按钮，选中的文件会先上传到 Dify，随下一条消息一起提交。<br><br>
       <b>提问建议：</b>知识库以急救内容为主（院前急救、心肺复苏、中暑、淹溺、电击伤、急性中毒、创伤止血包扎等）。超出范围时检索返回空结果，标记会显示「未命中知识库」，回答将退化为模型自有知识，准确性无保障。
     </div>
   </div>
@@ -253,8 +260,13 @@
 <div class="mask" id="kbMask"></div>
 <aside class="kb-drawer" id="kbDrawer"></aside>
 
+<!-- ==================== 数据统计抽屉 ==================== -->
+<div class="mask" id="statsMask"></div>
+<aside class="kb-drawer stats-drawer" id="statsDrawer"></aside>
+
 <div class="toast" id="toast"></div>
 <script src="/app.js"></script>
 <script src="/kb.js"></script>
+<script src="/stats.js"></script>
 </body>
 </html>
