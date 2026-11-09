@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="470" viewBox="0 0 520 470">
+<rect width="520" height="470" fill="#ffffff"/>
+<rect x="60" y="30" width="400" height="46" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="53.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">上传医学文件 txt/md/pdf/docx/xlsx</text>
+<line x1="260.0" y1="76" x2="260.0" y2="79" stroke="#059669" stroke-width="2"/><polygon points="260.0,88 251.0,79 269.0,79" fill="#059669"/>
+<rect x="60" y="88" width="400" height="46" rx="10" fill="#f0fdf4" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="111.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">提取正文</text>
+<line x1="260.0" y1="134" x2="260.0" y2="137" stroke="#059669" stroke-width="2"/><polygon points="260.0,146 251.0,137 269.0,137" fill="#059669"/>
+<rect x="60" y="146" width="400" height="46" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="169.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">LLM 生成问答对</text>
+<line x1="260.0" y1="192" x2="260.0" y2="195" stroke="#059669" stroke-width="2"/><polygon points="260.0,204 251.0,195 269.0,195" fill="#059669"/>
+<rect x="60" y="204" width="400" height="46" rx="10" fill="#f0fdf4" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="227.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">新建或复用知识库</text>
+<line x1="260.0" y1="250" x2="260.0" y2="253" stroke="#059669" stroke-width="2"/><polygon points="260.0,262 251.0,253 269.0,253" fill="#059669"/>
+<rect x="60" y="262" width="400" height="46" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="285.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">分段 + bge-m3 向量化</text>
+<line x1="260.0" y1="308" x2="260.0" y2="311" stroke="#059669" stroke-width="2"/><polygon points="260.0,320 251.0,311 269.0,311" fill="#059669"/>
+<rect x="60" y="320" width="400" height="46" rx="10" fill="#f0fdf4" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="343.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">写入 Dify 知识库</text>
+<line x1="260.0" y1="366" x2="260.0" y2="369" stroke="#059669" stroke-width="2"/><polygon points="260.0,378 251.0,369 269.0,369" fill="#059669"/>
+<rect x="60" y="378" width="400" height="46" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/><text x="260.0" y="401.0" font-family="Microsoft YaHei, Noto Sans CJK SC, PingFang SC, sans-serif" font-size="13" fill="#0f172a" text-anchor="middle" dominant-baseline="middle">列入检索库供问答检索</text>
+</svg>

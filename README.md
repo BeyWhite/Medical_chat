@@ -39,49 +39,15 @@
 
 **系统架构**
 
-```mermaid
-flowchart LR
-    U[浏览器 / 使用者] -->|HTTP + SSE| FE[前端页面 static/]
-    FE --> BE[server.py 后端服务 :8001]
-    BE -->|/v1/chat-messages| DIFY[Dify 工作流 问答7.0]
-    DIFY --> KB[(Weaviate 向量库 + PostgreSQL)]
-    DIFY --> LLM[大模型 Qwen3-14B / bge-m3 / bge-reranker]
-    BE --> DB[(SQLite 账号/会话/统计)]
-```
+![系统架构](assets/diagrams/architecture.svg)
 
 **一次问答的检索链路**
 
-```mermaid
-sequenceDiagram
-    participant U as 使用者
-    participant S as server.py
-    participant D as Dify 问答7.0
-    participant R as 知识检索节点
-    participant L as LLM(Qwen3-14B)
-    U->>S: 提问 query
-    S->>D: chat-messages(query)
-    D->>D: 扩展为 5 个相似问
-    par 多路并行检索
-        D->>R: 原问检索
-        D->>R: 相似问检索 x5
-    end
-    R-->>D: TopK 候选片段（阈值0.5 + 重排序）
-    D->>L: 汇总作答（附知识来源）
-    L-->>S: SSE 流式回答
-    S-->>U: 逐字展示
-```
+![一次问答的检索链路](assets/diagrams/sequence.svg)
 
 **知识库入库链路**
 
-```mermaid
-flowchart TD
-    F[上传医学文件 txt/md/pdf/docx/xlsx] --> E[提取正文]
-    E --> G[LLM 生成问答对]
-    G --> N[新建或复用知识库]
-    N --> V[分段 + bge-m3 向量化]
-    V --> W[(写入 Dify 知识库)]
-    W --> A[列入检索库供问答检索]
-```
+![知识库入库链路](assets/diagrams/ingestion.svg)
 
 ### 1.1 与其他项目的关系
 
